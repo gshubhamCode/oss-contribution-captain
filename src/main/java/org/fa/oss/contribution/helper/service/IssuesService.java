@@ -1,53 +1,45 @@
 package org.fa.oss.contribution.helper.service;
 
-import org.fa.oss.contribution.helper.model.GithubIssue;
-import org.fa.oss.contribution.helper.model.GithubIssueItem;
-import org.fa.oss.contribution.helper.utility.GithubApiHelper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
-import org.springframework.web.ErrorResponseException;
-import org.springframework.web.client.RestTemplate;
-
-import java.net.URISyntaxException;
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.List;
+import org.fa.oss.contribution.helper.config.GithubConfig;
+import org.fa.oss.contribution.helper.constants.Github;
+import org.fa.oss.contribution.helper.dto.response.IssueDTO;
+import org.kohsuke.github.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 @Service
 public class IssuesService {
 
-  private RestTemplate restTemplate = new RestTemplate();
+  @Autowired GithubConfig githubConfig;
 
-  @Autowired
-  GithubApiHelper githubApiHelper;
+  public List<IssueDTO> searchGoodFirstIssues() throws IOException {
+    GitHub github = new GitHubBuilder().withOAuthToken(githubConfig.getGithubToken()).build();
+    PagedSearchIterable<GHIssue> results =
+        github
+            .searchIssues()
+            .q("label:\"good first issue\" state:open stars:>50 is:issue")
+            .sort(GHIssueSearchBuilder.Sort.UPDATED)
+            .order(GHDirection.DESC)
+            .list();
 
-  public List<GithubIssueItem> getIssues() throws URISyntaxException {
-    List<GithubIssueItem> issuesList = getIssueItem();
-    return issuesList;
+    List<GHIssue> issuesList = results.withPageSize(Github.PAGE_SIZE).toList();
+
+    List<IssueDTO> issueDTOS =
+        issuesList.stream()
+            .map(
+                issue -> {
+                  String[] path = issue.getUrl().getPath().split("/");
+                  return IssueDTO.builder()
+                      .url(issue.getUrl().toString())
+                      .title(issue.getTitle())
+                      .description(issue.getTitle())
+                      .repositoryName(path[2] + "/" + path[3])
+                      .build();
+                })
+            .toList();
+
+    return issueDTOS;
   }
-
-  private List<GithubIssueItem> getIssueItem() throws URISyntaxException {
-    List<GithubIssueItem> issuesList = new ArrayList<>();
-
-    int pageNumber = 1;
-    int itemsTillNow = 0;
-    int totalCount = 0;
-    do {
-      String url = githubApiHelper.getIssuesUrl(pageNumber);
-      ResponseEntity<GithubIssue> response = restTemplate.getForEntity(url, GithubIssue.class);
-      if (response.getStatusCode() == HttpStatus.OK) {
-        GithubIssue issue = response.getBody();
-        totalCount = issue.getTotal_count();
-        issuesList.addAll(issue.getItems());
-        itemsTillNow += issue.getItems().size();
-        pageNumber++;
-      } else {
-        throw new ErrorResponseException(response.getStatusCode());
-      }
-    } while (itemsTillNow < totalCount);
-    return issuesList;
-  }
-
-
 }
