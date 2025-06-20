@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OwnerDTO {
-    private String login;
-    private String avatarUrl;
-    private String htmlUrl;
+  private String login;
+  private String avatarUrl;
+  private String htmlUrl;
 }

@@ -22,7 +22,7 @@ public class SummaryCacheService {
   private final ObjectMapper objectMapper;
 
   private static final String SUMMARY_FILENAME = "summary.json";
-  private static final int CACHE_VALIDITY_MINUTES = 60;
+  private static final int CACHE_VALIDITY_MINUTES = 0;
 
   public IssueSummaryResultListDTO getCachedOrGeneratedSummaries(int limit) {
     File summaryFile = new File(System.getProperty("user.dir") + File.separator + SUMMARY_FILENAME);

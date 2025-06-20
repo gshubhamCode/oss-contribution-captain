@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SummaryDTO {
-    private String main;
-    private String validationOrRequirement;
-    private String attemptedFixes;
-    private String otherNotes;
-    private String summaryText;
-    private boolean validJson;
+  private String main;
+  private String validationOrRequirement;
+  private String attemptedFixes;
+  private String otherNotes;
+  private String summaryText;
+  private boolean validJson;
 }

@@ -1,15 +1,14 @@
 package org.fa.oss.contribution.helper.service;
 
+import java.io.IOException;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import org.fa.oss.contribution.helper.dto.response.OwnerDTO;
 import org.fa.oss.contribution.helper.dto.response.RepositoryDTO;
 import org.kohsuke.github.GHRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class RepositoryService {
