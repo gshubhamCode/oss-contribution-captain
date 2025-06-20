@@ -14,4 +14,5 @@ import org.fa.oss.contribution.helper.dto.response.SummaryDTO;
 public class IssueSummary {
   IssueDTO issueDTO;
   SummaryDTO summary;
+  long updatedAt;
 }

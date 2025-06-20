@@ -49,10 +49,19 @@ public class IssuesService {
     try {
       List<GHIssue> issues = ghIssueService.getGHIssues();
       List<IssueDTO> issueDTOList = issues.stream().map(this::mapIssueToDTO).toList();
-      Map<String, RepositoryDTO> repositories = repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
-      issueDTOList.forEach( issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
-      saveIssues(issueDTOList);
-      return issueDTOList;
+      Map<String, RepositoryDTO> repositories =
+          repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
+      issueDTOList.forEach(
+          issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
+      List<IssueDTO> filteredIssues =
+          issueDTOList.parallelStream()
+              .filter(
+                  issue ->
+                      issue.getRepository().getStargazersCount() > 15
+                          && issue.getRepository().getForksCount() > 10)
+              .collect(Collectors.toList());
+      saveIssues(filteredIssues);
+      return filteredIssues;
     } catch (IOException e) {
       throw new RuntimeException("Failed to fetch issues from GitHub", e);
     }
