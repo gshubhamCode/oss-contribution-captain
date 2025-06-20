@@ -1,13 +1,12 @@
 package org.fa.oss.contribution.helper.service;
 
+import java.io.IOException;
+import java.util.List;
 import org.fa.oss.contribution.helper.config.GithubConfig;
 import org.fa.oss.contribution.helper.constants.Github;
 import org.kohsuke.github.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.util.List;
 
 @Service
 public class GHIssueService {
@@ -28,7 +27,7 @@ public class GHIssueService {
               .order(GHDirection.DESC)
               .list();
 
-      issues = results.withPageSize(Github.PAGE_SIZE).toList().subList(0,5);
+      issues = results.withPageSize(Github.PAGE_SIZE).toList();
     }
     return issues;
   }
