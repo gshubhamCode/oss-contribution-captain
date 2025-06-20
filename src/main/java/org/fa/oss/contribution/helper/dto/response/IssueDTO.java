@@ -26,4 +26,6 @@ public class IssueDTO {
   private Set<String> labels;
   private String state;
   @JsonIgnore private List<String> comments;
+
+  private RepositoryDTO repository;
 }

@@ -1,11 +1,11 @@
 package org.fa.oss.contribution.helper.model;
 
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.fa.oss.contribution.helper.dto.response.IssueDTO;
+import org.fa.oss.contribution.helper.dto.response.SummaryDTO;
 
 @Data
 @NoArgsConstructor
@@ -13,6 +13,5 @@ import org.fa.oss.contribution.helper.dto.response.IssueDTO;
 @Builder
 public class IssueSummary {
   IssueDTO issueDTO;
-  String summary;
-  List<String> languages;
+  SummaryDTO summary;
 }

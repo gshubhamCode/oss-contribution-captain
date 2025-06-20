@@ -5,13 +5,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.fa.oss.contribution.helper.config.GithubConfig;
-import org.fa.oss.contribution.helper.constants.Github;
 import org.fa.oss.contribution.helper.dto.response.IssueDTO;
+import org.fa.oss.contribution.helper.dto.response.RepositoryDTO;
 import org.kohsuke.github.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,27 +19,18 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 public class IssuesService {
-
-  @Autowired GithubConfig githubConfig;
-
   @Autowired ObjectMapper objectMapper;
 
+  @Autowired GHIssueService ghIssueService;
+
+  @Autowired RepositoryService repositoryService;
+
   private static final String ISSUES_FILENAME = "issues.json";
-  private static final int CACHE_VALIDITY_MINUTES = 60 * 24 * 365;
+  private static final int CACHE_VALIDITY_MINUTES = 60;
+
 
   public List<IssueDTO> searchGoodFirstIssues() throws IOException {
-    GitHub github = new GitHubBuilder().withOAuthToken(githubConfig.getGithubToken()).build();
-
-    PagedSearchIterable<GHIssue> results =
-        github
-            .searchIssues()
-            .q("label:\"good first issue\" state:open is:issue")
-            .sort(GHIssueSearchBuilder.Sort.UPDATED)
-            .order(GHDirection.DESC)
-            .list();
-
-    List<GHIssue> issuesList = results.withPageSize(Github.PAGE_SIZE).toList();
-
+    List<GHIssue> issuesList = ghIssueService.getGHIssues();
     return issuesList.parallelStream().map(this::mapIssueToDTO).filter(Objects::nonNull).toList();
   }
 
@@ -56,12 +47,20 @@ public class IssuesService {
     }
 
     try {
-      List<IssueDTO> issues = searchGoodFirstIssues();
-      saveIssues(issues);
-      return issues;
+      List<GHIssue> issues = ghIssueService.getGHIssues();
+      List<IssueDTO> issueDTOList = issues.stream().map(this::mapIssueToDTO).toList();
+      Map<String, RepositoryDTO> repositories = repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
+      issueDTOList.forEach( issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
+      saveIssues(issueDTOList);
+      return issueDTOList;
     } catch (IOException e) {
       throw new RuntimeException("Failed to fetch issues from GitHub", e);
     }
+  }
+
+  private boolean isFileOlderThan(File file, int minutes) {
+    long cutoff = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(minutes);
+    return file.lastModified() < cutoff;
   }
 
   public void saveIssues(List<IssueDTO> issueDTOS) {
@@ -73,11 +72,6 @@ public class IssuesService {
     } catch (IOException e) {
       throw new RuntimeException("Failed to write issues to file", e);
     }
-  }
-
-  private boolean isFileOlderThan(File file, int minutes) {
-    long cutoff = System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(minutes);
-    return file.lastModified() < cutoff;
   }
 
   private IssueDTO mapIssueToDTO(GHIssue issue) {
@@ -107,7 +101,7 @@ public class IssuesService {
 
     } catch (IOException e) {
       log.debug("Error mapping GitHub Issue to DTO (ID: {})", issue.getId(), e);
-      return null;
+      return IssueDTO.builder().build();
     }
   }
 }

@@ -1,11 +1,11 @@
 package org.fa.oss.contribution.helper.service;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +14,7 @@ import org.fa.oss.contribution.helper.dto.request.OllamaRequest;
 import org.fa.oss.contribution.helper.dto.response.IssueDTO;
 import org.fa.oss.contribution.helper.dto.response.IssueSummaryResultListDTO;
 import org.fa.oss.contribution.helper.dto.response.OllamaResponse;
+import org.fa.oss.contribution.helper.dto.response.SummaryDTO;
 import org.fa.oss.contribution.helper.model.IssueSummary;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -45,7 +46,7 @@ public class SummaryGenerator {
 
     String prompt = preparePrompt(issue);
     OllamaRequest request =
-        OllamaRequest.builder().model(Ollama.MODEL).prompt(prompt).stream(false).build();
+        OllamaRequest.builder().model(Ollama.MODEL).prompt(prompt).format("json").stream(false).build();
 
     log.info("Generating summary for issue: " + issue.getId());
     String response =
@@ -61,11 +62,21 @@ public class SummaryGenerator {
       objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
       OllamaResponse ollamaResponse = objectMapper.readValue(response, OllamaResponse.class);
       objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE);
-      log.debug(objectMapper.writeValueAsString(ollamaResponse));
+      log.info(objectMapper.writeValueAsString(ollamaResponse));
+      SummaryDTO summaryDTO;
+      try{
+        summaryDTO = objectMapper.readValue(ollamaResponse.getResponse(), SummaryDTO.class);
+        summaryDTO.setValidJson( true);
+        summaryDTO.setSummaryText("");
+      }catch (JsonParseException e){
+        summaryDTO = SummaryDTO.builder()
+                .summaryText(ollamaResponse.getResponse())
+                .validJson(false)
+                .build();
+      }
       return IssueSummary.builder()
           .issueDTO(issue)
-          .summary(ollamaResponse.getResponse())
-          .languages(new ArrayList<>())
+          .summary(summaryDTO)
           .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to parse Ollama response", e);
@@ -110,13 +121,19 @@ public class SummaryGenerator {
         You are a helpful assistant summarizing GitHub issues for contributors.
         Do not add your comments in the beginning like "the code summary is" or "Here is the summary of issue"
 
-        Summarize the following issue and make sure to have detailed info for each section and a line gap.
-        Keep formatting as shown below, summary should cover:
+        Below is a sample of summary generated for an issue. Keep the format of your response as shown in below example else you will be heavily penalised!!!
+        Example begins now
+        {"main": "The logo at the Header component is currently off-center, affecting the overall visual alignment and aesthetics of the page. The issue needs to be fixed so that the logo is horizontally centered within the header across all screen sizes.","validationOrRequirement": "The expected behavior is for the logo to be visually centered horizontally across all screen sizes without breaking responsiveness or causing regression on other header elements.","attemptedFixes": "The fix can be implemented using Styled Components to adjust the CSS layout and ensure the logo is centered after the fix. Turning relative URLs into absolute URLs would also address the issue as noticed by user osandamaleesha in one usage-rules.md file.","otherNotes": "This issue is currently labeled as 'bug' and 'good first issue', indicating it's a significant issue suitable for a contributor to tackle. A pull request should be submitted targeting the main branch with before/after screenshots or video if possible."}        
+        Example ends here
+        
+        Summarize the following issue and make sure to have detailed info for each section. Do not add * in the beginning of each section else you will be heavily penalised !.
+        summary should cover:
 
-        * Main request or goal - 
-        * Any validation rules or requirements - 
-        * Attempted fixes or blockers (if mentioned) - 
-        * Other notes - 
+        Main-
+        validationOrRequirement-
+        attemptedFixes -
+        otherNotes -
+
 
         GitHub Issue:
 

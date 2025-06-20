@@ -9,4 +9,5 @@ public class OllamaRequest {
   String model;
   String prompt;
   boolean stream;
+  String format;
 }
