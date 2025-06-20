@@ -4,3 +4,8 @@ spring:
 
 github:
   token: ${GITHUB_TOKEN}
+
+ollama:
+  url: http://localhost
+  port: 11434
+  model: llama3.2
