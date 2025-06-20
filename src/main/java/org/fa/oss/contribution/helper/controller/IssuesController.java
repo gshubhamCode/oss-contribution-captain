@@ -24,17 +24,16 @@ public class IssuesController {
 
   @GetMapping("/issues")
   public List<IssueDTO> getIssues() throws IOException {
-    List<IssueDTO> issues = issuesService.searchGoodFirstIssues();
-    issuesService.saveIssues(issues);
+    List<IssueDTO> issues = issuesService.getCachedOrFetchedIssues();
     return issues.stream().toList();
   }
 
   @GetMapping("/issues/summary")
   public IssueSummaryResultListDTO generateSummary() {
     try {
-      List<IssueDTO> issues = issuesService.searchGoodFirstIssues();
+      List<IssueDTO> issues = issuesService.getCachedOrFetchedIssues();
       IssueSummaryResultListDTO issueSummaryResultListDTO =
-          summaryGenerator.generateSummaries(issues.stream().limit(10).toList());
+              summaryGenerator.generateSummaries(issues.stream().limit(10).toList());
       summaryGenerator.saveSummaries(issueSummaryResultListDTO);
       return issueSummaryResultListDTO;
 

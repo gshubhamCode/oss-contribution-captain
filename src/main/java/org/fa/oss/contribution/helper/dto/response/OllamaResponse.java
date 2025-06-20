@@ -2,6 +2,7 @@ package org.fa.oss.contribution.helper.dto.response;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,6 +16,7 @@ public class OllamaResponse {
   private String response;
   private boolean done;
   private String doneReason;
+  @JsonIgnore
   private List<Integer> context;
   private long totalDuration;
   private long loadDuration;

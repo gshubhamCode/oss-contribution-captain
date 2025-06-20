@@ -81,7 +81,7 @@ public class IssuesService {
   }
 
   private IssueDTO mapIssueToDTO(GHIssue issue) {
-    log.info("Mapping issue: {}", issue.getId());
+    log.info("Mapping issue: {} {}", issue.getUrl(), issue.getTitle());
     String[] path = issue.getUrl().getPath().split("/");
 
     try {

@@ -18,7 +18,7 @@ public class IssueDTO {
   private String title;
   private String url;
   private String repositoryName;
-  @JsonIgnore private String description;
+  private String description;
   private Instant updatedAt;
   private String user;
   private String userHtmlUrl;

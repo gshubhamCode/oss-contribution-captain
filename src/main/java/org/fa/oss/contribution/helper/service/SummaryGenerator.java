@@ -61,6 +61,7 @@ public class SummaryGenerator {
       objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
       OllamaResponse ollamaResponse = objectMapper.readValue(response, OllamaResponse.class);
       objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE);
+      log.debug(objectMapper.writeValueAsString(ollamaResponse));
       return IssueSummary.builder()
           .issueDTO(issue)
           .summary(ollamaResponse.getResponse())
@@ -109,12 +110,13 @@ public class SummaryGenerator {
         You are a helpful assistant summarizing GitHub issues for contributors.
         Do not add your comments in the beginning like "the code summary is" or "Here is the summary of issue"
 
-        Summarize the following issue, covering:
+        Summarize the following issue and make sure to have detailed info for each section and a line gap.
+        Keep formatting as shown below, summary should cover:
 
-        * The main request or goal
-        * Any validation rules or requirements
-        * Attempted fixes or blockers (if mentioned)
-        * Other notes
+        * Main request or goal - 
+        * Any validation rules or requirements - 
+        * Attempted fixes or blockers (if mentioned) - 
+        * Other notes - 
 
         GitHub Issue:
 
