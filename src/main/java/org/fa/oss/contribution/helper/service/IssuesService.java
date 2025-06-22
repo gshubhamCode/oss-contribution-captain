@@ -54,6 +54,7 @@ public class IssuesService {
           issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
       List<IssueDTO> filteredIssues =
           issueDTOList.parallelStream()
+                  .filter(issueDTO -> Objects.nonNull(issueDTO.getRepository()))
               .filter(
                   issue ->
                       issue.getRepository().getStargazersCount() > 15

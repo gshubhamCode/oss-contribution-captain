@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
@@ -30,6 +31,12 @@ public class SummaryGenerator {
       WebClient.builder()
           .baseUrl(Ollama.URL_AND_PORT)
           .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .exchangeStrategies(
+              ExchangeStrategies.builder()
+                  .codecs(
+                      configurer ->
+                          configurer.defaultCodecs().maxInMemorySize(100 * 1024 * 1024)) // 100 MB
+                  .build())
           .build();
 
   @Autowired private IssuesService issuesService;
