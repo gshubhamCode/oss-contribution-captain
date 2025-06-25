@@ -3,6 +3,7 @@ package org.fa.oss.contribution.helper.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class SummaryCacheService {
   private final ObjectMapper objectMapper;
 
   private static final String SUMMARY_FILENAME = "summary.json";
-  private static final int CACHE_VALIDITY_MINUTES = 0;
+  private static final int CACHE_VALIDITY_MINUTES = 60 * 24 * 365;
 
   public IssueSummaryResultListDTO getCachedOrGeneratedSummaries(int limit) {
     File summaryFile = new File(System.getProperty("user.dir") + File.separator + SUMMARY_FILENAME);
@@ -35,20 +36,24 @@ public class SummaryCacheService {
         log.warn("Failed to read cached summary file, regenerating", e);
       }
     }
+    return  generateSummariesNoCacheUse(limit);
+  }
 
+  public IssueSummaryResultListDTO generateSummariesNoCacheUse(int limit){
     try {
       List<IssueDTO> issues = issuesService.getCachedOrFetchedIssues();
       List<IssueSummary> summaries =
-          summaryGenerator
-              .generateSummaries(maybeLimit(issues.stream(), limit).toList())
-              .getSummaries();
+              summaryGenerator
+                      .generateSummaries(maybeLimit(issues.stream(), limit).toList())
+                      .getSummaries();
 
       IssueSummaryResultListDTO result =
-          IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
+              IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
       saveSummariesToCache(result);
       return result;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to generate issue summaries", e);
+    } catch (Exception e) {
+      log.error("Failed to generate issue summaries", e);
+      return IssueSummaryResultListDTO.builder().count(0).summaries(Collections.emptyList()).build();
     }
   }
 
