@@ -9,6 +9,8 @@ import org.fa.oss.contribution.helper.service.SummaryCacheService;
 import org.fa.oss.contribution.helper.service.SummaryGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,5 +33,16 @@ public class IssuesController {
   @GetMapping("/issues/summaries")
   public IssueSummaryResultListDTO getSummaries() {
     return summaryCacheService.getCachedOrGeneratedSummaries(-1);
+  }
+
+
+  @PostMapping("/issues/summaries")
+  public IssueSummaryResultListDTO getSummary( @RequestBody  List<IssueDTO> issueDTO) {
+    return summaryGenerator.generateSummaries(issueDTO);
+  }
+
+  @GetMapping("/issues/summaries/nocache")
+  public IssueSummaryResultListDTO getSummariesNoCacheUsage(){
+    return summaryCacheService.generateSummariesNoCacheUse(-1);
   }
 }

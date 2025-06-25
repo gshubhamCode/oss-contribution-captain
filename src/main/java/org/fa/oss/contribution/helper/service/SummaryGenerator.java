@@ -43,17 +43,35 @@ public class SummaryGenerator {
 
   @Autowired private ObjectMapper objectMapper;
 
-  public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) throws IOException {
+  public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
+    try{
     List<IssueSummary> summaries =
-        issueDTOS.stream().map(issue -> generateIssueSummary(issue)).collect(Collectors.toList());
+        issueDTOS.stream()
+                .map(issue -> generateIssueSummary(issue)).collect(Collectors.toList());
     return IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
+    }catch (Exception e){
+      log.error("Error in generating summaries for issues using parallel stream", e);
+      return IssueSummaryResultListDTO.builder().summaries(Collections.emptyList()).count(Collections.emptyList().size()).build();
+
+    }
   }
 
   private IssueSummary generateIssueSummary(IssueDTO issue) {
 
     String prompt = preparePrompt(issue);
+    String format =
+        "{ \"type\": \"object\", \"properties\": { \"main\": { \"type\": \"string\", \"description\": \"A concise summary of the issue or bug being reported.\" }, \"validationOrRequirement\": { \"type\": \"string\", \"description\": \"The expected behavior or requirement that needs to be met.\" }, \"attemptedFixes\": { \"type\": \"string\", \"description\": \"Any attempted solutions or approaches that have been tried so far.\" }, \"otherNotes\": { \"type\": \"string\", \"description\": \"Additional context, labels, or contributor guidance related to the issue.\" } }, \"required\": [ \"main\", \"validationOrRequirement\", \"attemptedFixes\", \"otherNotes\" ] }";
+    Map<String, Object> formatSchema = null;
+    try {
+       formatSchema = objectMapper.readValue(
+              format, new TypeReference<>() {}
+      );
+    } catch (JsonProcessingException e) {
+      log.error("ollama response format key failed to parse to json", e);
+      formatSchema = Map.of("type","json");
+    }
     OllamaRequest request =
-        OllamaRequest.builder().model(Ollama.MODEL).prompt(prompt).format("json").stream(false)
+        OllamaRequest.builder().model(Ollama.MODEL).prompt(prompt).stream(false).format(formatSchema)
             .build();
 
     log.info("Generating summary for issue: " + issue.getId());
@@ -86,7 +104,12 @@ public class SummaryGenerator {
           .updatedAt(ollamaResponse.getCreatedAt().toEpochSecond())
           .build();
     } catch (IOException e) {
-      throw new RuntimeException("Failed to parse Ollama response", e);
+      log.error("Failed to parse Ollama response", e);
+      return IssueSummary.builder()
+              .issueDTO(issue)
+              .summary(SummaryDTO.builder().summaryText(response).validJson(false).build())
+              .updatedAt(ZonedDateTime.now().toEpochSecond())
+              .build();
     }
   }
 
@@ -119,16 +142,17 @@ public class SummaryGenerator {
       objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(filePath), summaries);
       System.out.println("Summaries saved to " + filePath);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to write summaries to file", e);
+      log.error("Failed to write summaries to file", e);
     }
   }
 
   private String getPromptTemplate() {
     return """
         You are a helpful assistant summarizing GitHub issues for contributors.
-        Do not add your comments in the beginning like "the code summary is" or "Here is the summary of issue"
+        Respond using JSON. Keep the format of your response as shown in below example else you will be heavily penalised!!!
+        Do not add your comments in the beginning like "the code summary is" or "Here is the summary of issue" or "You want to understand" or "}Summary:"
 
-        Below is a sample of summary generated for an issue. Keep the format of your response as shown in below example else you will be heavily penalised!!!
+        Below is a sample of summary generated for an issue.
         Example begins now
         {"main": "The logo at the Header component is currently off-center, affecting the overall visual alignment and aesthetics of the page. The issue needs to be fixed so that the logo is horizontally centered within the header across all screen sizes.","validationOrRequirement": "The expected behavior is for the logo to be visually centered horizontally across all screen sizes without breaking responsiveness or causing regression on other header elements.","attemptedFixes": "The fix can be implemented using Styled Components to adjust the CSS layout and ensure the logo is centered after the fix. Turning relative URLs into absolute URLs would also address the issue as noticed by user osandamaleesha in one usage-rules.md file.","otherNotes": "This issue is currently labeled as 'bug' and 'good first issue', indicating it's a significant issue suitable for a contributor to tackle. A pull request should be submitted targeting the main branch with before/after screenshots or video if possible."}
         Example ends here

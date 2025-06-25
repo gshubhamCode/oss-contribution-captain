@@ -1,6 +1,5 @@
 package org.fa.oss.contribution.helper.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -25,7 +24,7 @@ public class IssueDTO {
   private String userAvatarUrl;
   private Set<String> labels;
   private String state;
-  @JsonIgnore private List<String> comments;
+  private List<String> comments;
 
   private RepositoryDTO repository;
 }
