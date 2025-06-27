@@ -26,7 +26,7 @@ public class IssuesService {
   @Autowired RepositoryService repositoryService;
 
   private static final String ISSUES_FILENAME = "issues.json";
-  private static final int CACHE_VALIDITY_MINUTES = 0;
+  private static final int CACHE_VALIDITY_MINUTES = 120;
 
   public List<IssueDTO> searchGoodFirstIssues() throws IOException {
     List<GHIssue> issuesList = ghIssueService.getGHIssues();

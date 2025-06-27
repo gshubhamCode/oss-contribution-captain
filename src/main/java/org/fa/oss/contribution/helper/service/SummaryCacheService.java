@@ -23,7 +23,7 @@ public class SummaryCacheService {
   private final ObjectMapper objectMapper;
 
   private static final String SUMMARY_FILENAME = "summary.json";
-  private static final int CACHE_VALIDITY_MINUTES = 60 * 24 * 365;
+  private static final int CACHE_VALIDITY_MINUTES = 120;
 
   public IssueSummaryResultListDTO getCachedOrGeneratedSummaries(int limit) {
     File summaryFile = new File(System.getProperty("user.dir") + File.separator + SUMMARY_FILENAME);
@@ -33,7 +33,7 @@ public class SummaryCacheService {
       try {
         return objectMapper.readValue(summaryFile, IssueSummaryResultListDTO.class);
       } catch (IOException e) {
-        log.warn("Failed to read cached summary file, regenerating", e);
+        log.error("Failed to read cached summary file, regenerating", e);
       }
     }
     return  generateSummariesNoCacheUse(limit);
