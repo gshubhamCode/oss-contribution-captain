@@ -56,7 +56,7 @@ public class IssueSummaryTest {
       IssueSummaryResultListDTO issueSummaryResultListDTO =
           summaryGenerator.generateSummaries(issues);
       summaryGenerator.saveSummaries(issueSummaryResultListDTO);
-    } catch (IOException e) {
+    } catch (Exception e) {
       Assertions.fail("Exception thrown while testing", e);
       throw new RuntimeException(e);
     }
@@ -70,7 +70,7 @@ public class IssueSummaryTest {
       IssueSummaryResultListDTO issueSummaryResultListDTO =
           summaryGenerator.generateSummaries(issues);
       summaryGenerator.saveSummaries(issueSummaryResultListDTO);
-    } catch (IOException e) {
+    } catch (Exception e) {
       Assertions.fail("Exception thrown while testing", e);
       throw new RuntimeException(e);
     }
