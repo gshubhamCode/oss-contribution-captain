@@ -2,11 +2,17 @@ package org.fa.oss.contribution.helper.service;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.constants.Ollama;
@@ -16,6 +22,8 @@ import org.fa.oss.contribution.helper.dto.response.IssueSummaryResultListDTO;
 import org.fa.oss.contribution.helper.dto.response.OllamaResponse;
 import org.fa.oss.contribution.helper.dto.response.SummaryDTO;
 import org.fa.oss.contribution.helper.model.IssueSummary;
+import org.fa.oss.contribution.helper.model.OpenAIChatCompletionRequest;
+import org.fa.oss.contribution.helper.model.OpenAIChatCompletionResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,6 +34,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 @Slf4j
 public class SummaryGenerator {
+
+  public int prompt_tokens;
+  public int total_tokens;
+  public int completion_tokens;
 
   private WebClient webClient =
       WebClient.builder()
@@ -44,15 +56,35 @@ public class SummaryGenerator {
   @Autowired private ObjectMapper objectMapper;
 
   public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
-    try{
-    List<IssueSummary> summaries =
-        issueDTOS.stream()
-                .map(issue -> generateIssueSummary(issue)).collect(Collectors.toList());
-    return IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
-    }catch (Exception e){
-      log.error("Error in generating summaries for issues using parallel stream", e);
-      return IssueSummaryResultListDTO.builder().summaries(Collections.emptyList()).count(Collections.emptyList().size()).build();
+    try {
+      List<IssueSummary> summaries =
+          issueDTOS.parallelStream()
+              .map(
+                  issue -> {
+                    try {
+                      return generateIssueSummaryUsingOpenAI(issue);
+                    } catch (Exception e) {
+                      log.error("Skipping issue due to exception: {} {}", issue.getId(), issue.getTitle(), e);
+                      return null; // or Optional.empty()
+                    }
+                  })
+              .filter(Objects::nonNull)
+              .collect(Collectors.toList());
 
+      return IssueSummaryResultListDTO.builder()
+          .summaries(summaries)
+          .count(summaries.size())
+          .build();
+    } catch (Exception e) {
+      log.error("Error in generating summaries for issues using parallel stream", e);
+      return IssueSummaryResultListDTO.builder()
+          .summaries(Collections.emptyList())
+          .count(Collections.emptyList().size())
+          .build();
+    } finally{
+      log.info("prompt_tokens: " + prompt_tokens);
+      log.info("completion_tokens: " + completion_tokens);
+      log.info("total_tokens: " + total_tokens);
     }
   }
 
@@ -63,15 +95,14 @@ public class SummaryGenerator {
         "{ \"type\": \"object\", \"properties\": { \"main\": { \"type\": \"string\", \"description\": \"A concise summary of the issue or bug being reported.\" }, \"validationOrRequirement\": { \"type\": \"string\", \"description\": \"The expected behavior or requirement that needs to be met.\" }, \"attemptedFixes\": { \"type\": \"string\", \"description\": \"Any attempted solutions or approaches that have been tried so far.\" }, \"otherNotes\": { \"type\": \"string\", \"description\": \"Additional context, labels, or contributor guidance related to the issue.\" } }, \"required\": [ \"main\", \"validationOrRequirement\", \"attemptedFixes\", \"otherNotes\" ] }";
     Map<String, Object> formatSchema = null;
     try {
-       formatSchema = objectMapper.readValue(
-              format, new TypeReference<>() {}
-      );
+      formatSchema = objectMapper.readValue(format, new TypeReference<>() {});
     } catch (JsonProcessingException e) {
       log.error("ollama response format key failed to parse to json", e);
-      formatSchema = Map.of("type","json");
+      formatSchema = Map.of("type", "json");
     }
     OllamaRequest request =
-        OllamaRequest.builder().model(Ollama.MODEL).prompt(prompt).stream(false).format(formatSchema)
+        OllamaRequest.builder().model(Ollama.MODEL).prompt(prompt).stream(false)
+            .format(formatSchema)
             .build();
 
     log.info("Generating summary for issue: " + issue.getId());
@@ -106,10 +137,78 @@ public class SummaryGenerator {
     } catch (IOException e) {
       log.error("Failed to parse Ollama response", e);
       return IssueSummary.builder()
-              .issueDTO(issue)
-              .summary(SummaryDTO.builder().summaryText(response).validJson(false).build())
-              .updatedAt(ZonedDateTime.now().toEpochSecond())
-              .build();
+          .issueDTO(issue)
+          .summary(SummaryDTO.builder().summaryText(response).validJson(false).build())
+          .updatedAt(ZonedDateTime.now().toEpochSecond())
+          .build();
+    }
+  }
+
+  private IssueSummary generateIssueSummaryUsingOpenAI(IssueDTO issue) {
+
+    String prompt = preparePrompt(issue);
+
+    OpenAIChatCompletionRequest request = OpenAIChatCompletionRequest.getDefaultChatRequest(prompt);
+    request.setModel("01-ai/Yi-34B-Chat");
+    log.info("Generating summary for issue: " + issue.getId() + " title: " + issue.getTitle());
+
+    String responseJson =
+        webClient
+            .post()
+            .uri("https://gv1gj0u3l0jh1f-8000.proxy.runpod.net/v1/chat/completions")
+            .header("Authorization", "Bearer sk-IrR7Bwxtin0haWagUnPrBgq5PurnUz86")
+            .bodyValue(request)
+            .retrieve()
+            .bodyToMono(String.class)
+            .block();
+
+    try {
+      // Parse the vLLM / OpenAI completion response
+      OpenAIChatCompletionResponse completionResponse =
+          objectMapper.readValue(responseJson, OpenAIChatCompletionResponse.class);
+      log.info(completionResponse.getUsage().toString());
+
+      // TO DO:: remove code
+      OpenAIChatCompletionResponse.Usage usage = completionResponse.getUsage();
+      prompt_tokens = Math.max(prompt_tokens, usage.getPrompt_tokens());
+      total_tokens = Math.max(total_tokens, usage.getTotal_tokens());
+      completion_tokens = Math.max(completion_tokens, usage.getCompletion_tokens());
+
+
+      // Extract the generated text from response (usually in choices[0].text or .message.content)
+      String generatedText =
+          completionResponse
+              .getChoices()
+              .get(0)
+              .getMessage()
+              .getTool_calls()
+              .get(0)
+              .function
+              .arguments;
+
+      // Parse generatedText as your expected JSON format (the same format schema you want)
+      SummaryDTO summaryDTO;
+      try {
+        summaryDTO = objectMapper.readValue(generatedText, SummaryDTO.class);
+        summaryDTO.setValidJson(true);
+        summaryDTO.setSummaryText("");
+      } catch (JsonParseException e) {
+        summaryDTO = SummaryDTO.builder().summaryText(generatedText).validJson(false).build();
+      }
+
+      return IssueSummary.builder()
+          .issueDTO(issue)
+          .summary(summaryDTO)
+          .updatedAt(Instant.now().getEpochSecond())
+          .build();
+
+    } catch (IOException e) {
+      log.error("Failed to parse completion response", e);
+      return IssueSummary.builder()
+          .issueDTO(issue)
+          .summary(SummaryDTO.builder().summaryText(responseJson).validJson(false).build())
+          .updatedAt(Instant.now().getEpochSecond())
+          .build();
     }
   }
 
