@@ -1,15 +1,21 @@
 package org.fa.oss.contribution.helper.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@ConfigurationProperties(prefix = "github")
+@Getter
+@Setter
 public class GithubConfig {
 
-  @Value("${github.token}")
-  public String githubToken;
+  public String token;
+  private long issuesTtlMillis;
 
-  public String getGithubToken() {
-    return githubToken;
+
+  public String getToken() {
+    return token;
   }
 }

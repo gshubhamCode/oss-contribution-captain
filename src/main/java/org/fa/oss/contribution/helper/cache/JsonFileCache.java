@@ -1,0 +1,118 @@
+package org.fa.oss.contribution.helper.cache;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.fa.oss.contribution.helper.config.CacheProperties;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.SyncFailedException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+
+@Slf4j
+public abstract class JsonFileCache<T> implements CacheService<T> {
+
+  private static final long DEFAULT_MAX_AGE_MILLIS = 120 * 60 * 1000; // 120 minutes
+  private final ObjectMapper mapper;
+  private final File file;
+  private final TypeReference<T> typeRef;
+
+  private long maxAgeMillis;
+
+  protected boolean firstLoadDone = false;
+
+
+  public JsonFileCache(
+      ObjectMapper mapper,
+      CacheProperties properties,
+      String fileName,
+      TypeReference<T> typeRef,
+      long maxAgeMillis) {
+    String baseDir = properties.getBaseDir();
+    this.file = new File(baseDir, fileName);
+    this.typeRef = typeRef;
+    this.mapper = mapper;
+    this.maxAgeMillis = maxAgeMillis;
+  }
+
+  public JsonFileCache(
+      ObjectMapper mapper, CacheProperties properties, String fileName, TypeReference<T> typeRef) {
+    this(mapper, properties, fileName, typeRef, DEFAULT_MAX_AGE_MILLIS);
+  }
+
+  public long getMaxAgeMillis() {
+    return maxAgeMillis;
+  }
+
+  public void setMaxAgeMillis(long maxAgeMillis) {
+    this.maxAgeMillis = maxAgeMillis;
+  }
+
+  public File getFile() {
+    return file;
+  }
+
+  @Override
+  public T load() {
+    if (!isCacheValid()) {
+      return null;
+    }
+
+    try {
+      firstLoadDone = true;
+      return mapper.readValue(file, typeRef);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load cache from " + file.getAbsolutePath(), e);
+    }
+  }
+
+  public synchronized void save(T data) {
+    file.getParentFile().mkdirs();
+
+    File tmpFile = new File(file.getAbsolutePath() + ".tmp");
+
+    try (FileOutputStream fos = new FileOutputStream(tmpFile);
+        FileChannel channel = fos.getChannel();
+        FileLock lock = channel.lock()) {
+
+      mapper.writerWithDefaultPrettyPrinter().writeValue(fos, data);
+      fos.flush();
+      try {
+        fos.getFD().sync(); // Flush to disk for durability
+      } catch (SyncFailedException e) {
+        log.warn("Sync failed for " + tmpFile.getAbsolutePath(), e);
+      }
+
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to save cache atomically to " + file.getAbsolutePath(), e);
+    }
+
+    if (!tmpFile.renameTo(file)) {
+      throw new RuntimeException(
+              "Failed to rename temp file to cache file: " + file.getAbsolutePath());
+      }
+  }
+
+  @Override
+  public boolean isCacheValid() {
+    if (!file.exists()) return false;
+
+    if(!firstLoadDone){
+      return true;
+      }
+
+    long lastModified = file.lastModified();
+    long age = System.currentTimeMillis() - lastModified;
+
+    return age <= maxAgeMillis;
+  }
+
+  @Override
+  public long getCacheAgeMillis() {
+    if (!file.exists()) return -1;
+    return System.currentTimeMillis() - file.lastModified();
+  }
+}

@@ -11,24 +11,36 @@ import org.springframework.stereotype.Service;
 @Service
 public class GHIssueService {
 
-  @Autowired GithubConfig githubConfig;
+  @Autowired private GithubConfig githubConfig;
 
   private List<GHIssue> issues;
+  private long lastFetchTime = 0L;
 
-  List<GHIssue> getGHIssues() throws IOException {
-    if (issues == null) {
-      GitHub github = new GitHubBuilder().withOAuthToken(githubConfig.getGithubToken()).build();
+  public List<GHIssue> getGHIssues() throws IOException {
+    long now = System.currentTimeMillis();
+    long ttl = githubConfig.getIssuesTtlMillis();
 
-      PagedSearchIterable<GHIssue> results =
-          github
-              .searchIssues()
-              .q("label:\"good first issue\" state:open is:issue")
-              .sort(GHIssueSearchBuilder.Sort.UPDATED)
-              .order(GHDirection.DESC)
-              .list();
-
-      issues = results.withPageSize(Github.PAGE_SIZE).toList();
+    if (issues == null || (now - lastFetchTime) > ttl) {
+      return forceRefreshIssues(); // auto-refresh if stale
     }
+
+    return issues;
+  }
+
+  public List<GHIssue> forceRefreshIssues() throws IOException {
+    GitHub github = new GitHubBuilder()
+            .withOAuthToken(githubConfig.getToken())
+            .build();
+
+    PagedSearchIterable<GHIssue> results = github.searchIssues()
+            .q("label:\"good first issue\" state:open is:issue")
+            .sort(GHIssueSearchBuilder.Sort.UPDATED)
+            .order(GHDirection.DESC)
+            .list();
+
+    issues = results.withPageSize(Github.PAGE_SIZE).toList();
+    lastFetchTime = System.currentTimeMillis();
+
     return issues;
   }
 }

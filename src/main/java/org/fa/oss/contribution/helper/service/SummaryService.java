@@ -5,7 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import java.io.File;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -14,7 +14,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import lombok.extern.slf4j.Slf4j;
+import org.fa.oss.contribution.helper.cache.CentralCacheService;
 import org.fa.oss.contribution.helper.config.RunPodConfig;
 import org.fa.oss.contribution.helper.constants.Ollama;
 import org.fa.oss.contribution.helper.dto.request.OllamaRequest;
@@ -34,18 +37,17 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
 @Slf4j
-public class SummaryGenerator {
+public class SummaryService {
+
+  @Autowired private RunPodManager runPodManager;
+  @Autowired private RunPodConfig runPodConfig;
+  @Autowired private IssuesService issuesService;
+  @Autowired private ObjectMapper objectMapper;
+  @Autowired private CentralCacheService centralCacheService;
 
   public int prompt_tokens;
   public int total_tokens;
   public int completion_tokens;
-
-  @Autowired RunPodManager runPodManager;
-
-  @Autowired RunPodConfig runPodConfig;
-
-  @Autowired ObjectMapper objectMapper;
-  @Autowired private IssuesService issuesService;
 
   private WebClient webClient =
       WebClient.builder()
@@ -158,6 +160,46 @@ public class SummaryGenerator {
     }
   }
 
+  public IssueSummaryResultListDTO getCachedOrGeneratedSummaries(int limit) {
+    IssueSummaryResultListDTO cached = centralCacheService.getSummaryCache().load();
+    if (cached != null) {
+      log.info("Loaded {} summaries from cache", cached.getCount());
+      return cached;
+    }
+    return generateAndCacheSummaries(limit);
+  }
+
+  public IssueSummaryResultListDTO generateAndCacheSummaries(int limit) {
+    try {
+      runPodManager.startPod();
+      runPodManager.waitForRunningPod();
+
+      List<IssueDTO> issues;
+      if (centralCacheService.getIssueCache().isCacheValid()) {
+        issues = centralCacheService.getIssueCache().load();
+      } else {
+        issues = issuesService.getIssues();
+      }
+      List<IssueSummary> summaries =
+          maybeLimit(issues.parallelStream(), limit)
+              .map(this::generateIssueSummaryUsingVllm)
+              .filter(Objects::nonNull)
+              .collect(Collectors.toList());
+
+      IssueSummaryResultListDTO result =
+          IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
+
+      centralCacheService.getSummaryCache().save(result);
+      return result;
+
+    } catch (Exception e) {
+      log.error("Failed to generate summaries", e);
+      return IssueSummaryResultListDTO.builder().count(0).summaries(List.of()).build();
+    } finally {
+      runPodManager.stopPod();
+    }
+  }
+
   private IssueSummary generateIssueSummaryUsingOpenAI(IssueDTO issue) {
 
     String prompt = preparePrompt(issue);
@@ -187,7 +229,6 @@ public class SummaryGenerator {
       prompt_tokens = Math.max(prompt_tokens, usage.getPrompt_tokens());
       total_tokens = Math.max(total_tokens, usage.getTotal_tokens());
       completion_tokens = Math.max(completion_tokens, usage.getCompletion_tokens());
-
 
       // Extract the generated text from response (usually in choices[0].text or .message.content)
       String generatedText =
@@ -248,15 +289,59 @@ public class SummaryGenerator {
     }
   }
 
-  public void saveSummaries(IssueSummaryResultListDTO summaries) {
+  private IssueSummary generateIssueSummaryUsingVllm(IssueDTO issue) {
+    String prompt = preparePrompt(issue);
+    String chatCompletionUrl =
+        "https://" + runPodConfig.getPodId() + "-8000.proxy.runpod.net/v1/chat/completions";
+
     try {
-      String currentDir = System.getProperty("user.dir");
-      String filePath = currentDir + File.separator + "summary.json";
-      objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(filePath), summaries);
-      System.out.println("Summaries saved to " + filePath);
-    } catch (IOException e) {
-      log.error("Failed to write summaries to file", e);
+      OpenAIChatCompletionRequest request =
+          OpenAIChatCompletionRequest.getDefaultChatRequest(prompt);
+      String responseJson =
+          webClient
+              .post()
+              .uri(chatCompletionUrl)
+              .header("Authorization", "Bearer " + runPodConfig.getVllmApiKey())
+              .bodyValue(request)
+              .retrieve()
+              .bodyToMono(String.class)
+              .block();
+
+      OpenAIChatCompletionResponse response =
+          objectMapper.readValue(responseJson, OpenAIChatCompletionResponse.class);
+
+      String resultJson =
+          response
+              .getChoices()
+              .get(0)
+              .getMessage()
+              .getTool_calls()
+              .get(0)
+              .getFunction()
+              .getArguments();
+      SummaryDTO summaryDTO;
+
+      try {
+        summaryDTO = objectMapper.readValue(resultJson, SummaryDTO.class);
+        summaryDTO.setValidJson(true);
+      } catch (JsonParseException e) {
+        summaryDTO = SummaryDTO.builder().summaryText(resultJson).validJson(false).build();
+      }
+
+      return IssueSummary.builder()
+          .issueDTO(issue)
+          .summary(summaryDTO)
+          .updatedAt(Instant.now().getEpochSecond())
+          .build();
+
+    } catch (Exception e) {
+      log.error("Failed to generate summary for issue {}", issue.getId(), e);
+      return null;
     }
+  }
+
+  private <T> Stream<T> maybeLimit(Stream<T> stream, int limit) {
+    return limit > 0 ? stream.limit(limit) : stream;
   }
 
   private String getPromptTemplate() {
