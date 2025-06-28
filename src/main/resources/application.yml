@@ -9,3 +9,8 @@ ollama:
   url: http://localhost
   port: 11434
   model: llama3.2
+
+runpod:
+  api-key: ${RUNPOD_API_KEY}
+  vllm-api-Key: ${VLLM_API_KEY}
+  pod-id: ${RUNPOD_POD_ID}
