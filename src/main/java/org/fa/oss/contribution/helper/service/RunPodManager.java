@@ -79,6 +79,8 @@ public class RunPodManager {
 
     if (ip == null) throw new RuntimeException("Pod never became ready after 40 minutes");
     log.info("Public ip of pod {}:{}", runPodConfig.getPodId(), ip );
+    log.info("Waiting for 2 minutes to let app initialise on container");
+    Thread.sleep(120_000);
     return ip;
   }
 

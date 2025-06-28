@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+
+import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.dto.response.OwnerDTO;
 import org.fa.oss.contribution.helper.dto.response.RepositoryDTO;
 import org.kohsuke.github.GHRepository;
@@ -11,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class RepositoryService {
 
   @Autowired GHIssueService ghIssueService;
@@ -24,7 +27,12 @@ public class RepositoryService {
             issue -> {
               String key = getRepositoryNameFromUrl(issue.getUrl());
               // Only call getRepository() if key is not in map or has null value
-              repoMap.computeIfAbsent(key, k -> issue.getRepository());
+                try{
+                repoMap.computeIfAbsent(key, k -> issue.getRepository());
+                }catch (Exception e){
+                  log.debug("Repo not found for issue. url: {}, issue: {}", key, issue.getHtmlUrl());
+                }
+
             });
     return repoMap;
   }
