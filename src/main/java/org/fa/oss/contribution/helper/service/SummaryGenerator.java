@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.fa.oss.contribution.helper.config.RunPodConfig;
 import org.fa.oss.contribution.helper.constants.Ollama;
 import org.fa.oss.contribution.helper.dto.request.OllamaRequest;
 import org.fa.oss.contribution.helper.dto.response.IssueDTO;
@@ -39,6 +40,13 @@ public class SummaryGenerator {
   public int total_tokens;
   public int completion_tokens;
 
+  @Autowired RunPodManager runPodManager;
+
+  @Autowired RunPodConfig runPodConfig;
+
+  @Autowired ObjectMapper objectMapper;
+  @Autowired private IssuesService issuesService;
+
   private WebClient webClient =
       WebClient.builder()
           .baseUrl(Ollama.URL_AND_PORT)
@@ -51,12 +59,12 @@ public class SummaryGenerator {
                   .build())
           .build();
 
-  @Autowired private IssuesService issuesService;
-
-  @Autowired private ObjectMapper objectMapper;
-
   public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
+
     try {
+      runPodManager.startPod();
+      runPodManager.waitForRunningPod();
+
       List<IssueSummary> summaries =
           issueDTOS.parallelStream()
               .map(
@@ -64,8 +72,12 @@ public class SummaryGenerator {
                     try {
                       return generateIssueSummaryUsingOpenAI(issue);
                     } catch (Exception e) {
-                      log.error("Skipping issue due to exception: {} {}", issue.getId(), issue.getTitle(), e);
-                      return null; // or Optional.empty()
+                      log.error(
+                          "Skipping issue due to exception: {} {}",
+                          issue.getId(),
+                          issue.getTitle(),
+                          e);
+                      return null;
                     }
                   })
               .filter(Objects::nonNull)
@@ -81,7 +93,9 @@ public class SummaryGenerator {
           .summaries(Collections.emptyList())
           .count(Collections.emptyList().size())
           .build();
-    } finally{
+    } finally {
+      runPodManager.stopPod();
+
       log.info("prompt_tokens: " + prompt_tokens);
       log.info("completion_tokens: " + completion_tokens);
       log.info("total_tokens: " + total_tokens);
@@ -149,14 +163,14 @@ public class SummaryGenerator {
     String prompt = preparePrompt(issue);
 
     OpenAIChatCompletionRequest request = OpenAIChatCompletionRequest.getDefaultChatRequest(prompt);
-    request.setModel("01-ai/Yi-34B-Chat");
     log.info("Generating summary for issue: " + issue.getId() + " title: " + issue.getTitle());
-
+    String chatCompletionUrl =
+        "https://" + runPodConfig.getPodId() + "-8000.proxy.runpod.net/v1/chat/completions";
     String responseJson =
         webClient
             .post()
-            .uri("https://gv1gj0u3l0jh1f-8000.proxy.runpod.net/v1/chat/completions")
-            .header("Authorization", "Bearer sk-IrR7Bwxtin0haWagUnPrBgq5PurnUz86")
+            .uri(chatCompletionUrl)
+            .header("Authorization", "Bearer " + runPodConfig.getVllmApiKey())
             .bodyValue(request)
             .retrieve()
             .bodyToMono(String.class)
