@@ -36,6 +36,8 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
     this.typeRef = typeRef;
     this.mapper = mapper;
     this.maxAgeMillis = maxAgeMillis;
+
+    this.file.getParentFile().mkdirs();
   }
 
   public JsonFileCache(

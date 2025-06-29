@@ -19,7 +19,7 @@ runpod:
   pod-id: ${RUNPOD_POD_ID}
 
 cache:
-  base-dir: ${user.home}/.cache/oss-captain
+  base-dir: ${CACHE_DIR:/workspace/volume/cache}
 
 contribution:
   scheduler:

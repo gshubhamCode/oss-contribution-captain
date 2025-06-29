@@ -56,22 +56,48 @@ public class SummaryService {
 
   public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
     final ExecutorService ioExecutor = Executors.newFixedThreadPool(8);
-    ;
     try {
       runPodManager.startPod();
       runPodManager.waitForRunningPod();
+      List<IssueDTO> filteredIssues =
+          issueDTOS.parallelStream()
+              .filter(
+                  issue -> {
+                    try {
+                      String prompt = promptService.preparePrompt(issue);
+                      long tokenCount = TokenCounter.countTokens(prompt);
+                      if (tokenCount < CONTEXT_TOKEN_LIMIT) {
+                        return true;
+                      } else {
+                        log.warn(
+                            "Token check failed. issue: {}, token count: {}, limit: {}",
+                            issue.getUrl(),
+                            tokenCount,
+                            CONTEXT_TOKEN_LIMIT);
+                        return false;
+                      }
+                    } catch (Exception e) {
+                      log.error(
+                          "Token check failed due to exception for issue {}: {}",
+                          issue.getUrl(),
+                          e.getMessage(),
+                          e);
+                      return false;
+                    }
+                  })
+              .collect(Collectors.toList());
 
       List<Throwable> errors = Collections.synchronizedList(new ArrayList<>());
       List<CompletableFuture<IssueSummary>> futures =
-          issueDTOS.stream()
+          filteredIssues.stream()
               .map(
                   issue ->
                       CompletableFuture.supplyAsync(
                           () -> {
                             try {
                               return generateIssueSummaryUsingOpenAI(
-                                  issue); // makes an HTTP call, etc.
-                            } catch (WebClientResponseException.BadRequest e) {
+                                  issue);
+                            } catch (WebClientResponseException e) {
                               log.error(
                                   "400 Bad Request - likely context length exceeded: {}",
                                   e.getResponseBodyAsString());
@@ -108,18 +134,25 @@ public class SummaryService {
         log.warn("Summary generation completed with {} errors", errors.size());
       }
 
-      return IssueSummaryResultListDTO.builder()
-          .summaries(summaries)
-          .count(summaries.size())
-          .build();
+      IssueSummaryResultListDTO result =
+          IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
+      log.info("Saving summaries in cache");
+      centralCacheService.getSummaryCache().save(result);
+      log.info("Summaries saved in cache");
+      return result;
+
     } catch (Exception e) {
-      log.error("Error in generating summaries for issues using parallel stream", e);
+      log.error("Failed to generate summaries", e);
       return IssueSummaryResultListDTO.builder()
           .summaries(Collections.emptyList())
           .count(Collections.emptyList().size())
           .build();
     } finally {
-      // runPodManager.stopPod();
+      try {
+        runPodManager.stopPod();
+      } catch (Exception ex) {
+        log.warn("Error stopping pod", ex);
+      }
       if (ioExecutor != null) {
         ioExecutor.shutdown();
       }
@@ -136,66 +169,16 @@ public class SummaryService {
   }
 
   public IssueSummaryResultListDTO generateSummaries(int limit) {
-    try {
-      runPodManager.startPod();
-      runPodManager.waitForRunningPod();
-
-      List<IssueDTO> issues;
-      if (centralCacheService.getIssueCache() != null) {
-        issues = centralCacheService.getIssueCache().load();
-      } else {
-        issues = issuesService.getIssues();
-      }
-
-      List<IssueDTO> filteredIssues =
-          issues.parallelStream()
-              .filter(
-                  issue -> {
-                    try {
-                      String prompt = promptService.preparePrompt(issue);
-                      long tokenCount = TokenCounter.countTokens(prompt);
-                      if (tokenCount < CONTEXT_TOKEN_LIMIT) {
-                        return true;
-                      } else {
-                        log.warn(
-                            "Token check failed. issue: {}, token count: {}, limit: {}",
-                            issue.getUrl(),
-                            tokenCount,
-                            CONTEXT_TOKEN_LIMIT);
-                        return  false;
-                      }
-                    } catch (Exception e) {
-                      log.error(
-                          "Token check failed due to exception for issue {}: {}",
-                          issue.getUrl(),
-                          e.getMessage(),
-                          e);
-                      return false;
-                    }
-                  })
-              .collect(Collectors.toList());
-
-      log.info("Generating summaries");
-      List<IssueSummary> summaries =
-          filteredIssues.parallelStream()
-              .map(this::generateIssueSummaryUsingOpenAI)
-              .filter(Objects::nonNull)
-              .collect(Collectors.toList());
-
-      IssueSummaryResultListDTO result =
-          IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
-
-      log.info("Saving summaries in cache");
-      centralCacheService.getSummaryCache().save(result);
-      log.info("Summaries saved in cache");
-      return result;
-
-    } catch (Exception e) {
-      log.error("Failed to generate summaries", e);
-      return IssueSummaryResultListDTO.builder().count(0).summaries(List.of()).build();
-    } finally {
-      runPodManager.stopPod();
+    List<IssueDTO> issues;
+    if (centralCacheService.getIssueCache() != null) {
+      issues = centralCacheService.getIssueCache().load();
+    } else {
+      issues = issuesService.getIssues();
     }
+
+    List<IssueDTO> filteredIssues = maybeLimit(issues.stream(), limit).collect(Collectors.toList());
+
+    return generateSummaries(filteredIssues);
   }
 
   private IssueSummary generateIssueSummaryUsingOpenAI(IssueDTO issue) {

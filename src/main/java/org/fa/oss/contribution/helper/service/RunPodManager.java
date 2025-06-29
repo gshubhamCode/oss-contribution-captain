@@ -79,7 +79,7 @@ public class RunPodManager {
 
     if (ip == null) throw new RuntimeException("Pod never became ready after 40 minutes");
     log.info("Public ip of pod {}:{}", runPodConfig.getPodId(), ip );
-    log.info("Waiting for 2 minutes to let LLM initialise on pod");
+    log.info("Waiting for 3 minutes to let LLM initialise on pod");
     Thread.sleep(180_000);
     return ip;
   }
