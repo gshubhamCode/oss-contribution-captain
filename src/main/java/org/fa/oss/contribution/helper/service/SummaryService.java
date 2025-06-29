@@ -29,6 +29,7 @@ import org.fa.oss.contribution.helper.model.IssueSummary;
 import org.fa.oss.contribution.helper.model.OpenAIChatCompletionRequest;
 import org.fa.oss.contribution.helper.model.OpenAIChatCompletionResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -45,24 +46,21 @@ public class SummaryService {
   @Autowired private ObjectMapper objectMapper;
   @Autowired private CentralCacheService centralCacheService;
 
-  public int prompt_tokens;
-  public int total_tokens;
-  public int completion_tokens;
+  @Autowired private PromptService promptService;
 
-  private WebClient webClient =
-      WebClient.builder()
-          .baseUrl(Ollama.URL_AND_PORT)
-          .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-          .exchangeStrategies(
-              ExchangeStrategies.builder()
-                  .codecs(
-                      configurer ->
-                          configurer.defaultCodecs().maxInMemorySize(100 * 1024 * 1024)) // 100 MB
-                  .build())
-          .build();
+  private static final int HUNDRED_MB = 100 * 1024 * 1024;
+
+  private final WebClient webClient =
+          WebClient.builder()
+                  .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                  .exchangeStrategies(
+                          ExchangeStrategies.builder()
+                                  .codecs(configurer ->
+                                          configurer.defaultCodecs().maxInMemorySize(HUNDRED_MB))
+                                  .build())
+                  .build();
 
   public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
-
     try {
       runPodManager.startPod();
       runPodManager.waitForRunningPod();
@@ -97,92 +95,33 @@ public class SummaryService {
           .build();
     } finally {
       runPodManager.stopPod();
-
-      log.info("prompt_tokens: " + prompt_tokens);
-      log.info("completion_tokens: " + completion_tokens);
-      log.info("total_tokens: " + total_tokens);
     }
   }
 
-  private IssueSummary generateIssueSummary(IssueDTO issue) {
 
-    String prompt = preparePrompt(issue);
-    String format =
-        "{ \"type\": \"object\", \"properties\": { \"main\": { \"type\": \"string\", \"description\": \"A concise summary of the issue or bug being reported.\" }, \"validationOrRequirement\": { \"type\": \"string\", \"description\": \"The expected behavior or requirement that needs to be met.\" }, \"attemptedFixes\": { \"type\": \"string\", \"description\": \"Any attempted solutions or approaches that have been tried so far.\" }, \"otherNotes\": { \"type\": \"string\", \"description\": \"Additional context, labels, or contributor guidance related to the issue.\" } }, \"required\": [ \"main\", \"validationOrRequirement\", \"attemptedFixes\", \"otherNotes\" ] }";
-    Map<String, Object> formatSchema = null;
-    try {
-      formatSchema = objectMapper.readValue(format, new TypeReference<>() {});
-    } catch (JsonProcessingException e) {
-      log.error("ollama response format key failed to parse to json", e);
-      formatSchema = Map.of("type", "json");
-    }
-    OllamaRequest request =
-        OllamaRequest.builder().model(Ollama.MODEL).prompt(prompt).stream(false)
-            .format(formatSchema)
-            .build();
-
-    log.info("Generating summary for issue: " + issue.getId());
-    String response =
-        webClient
-            .post()
-            .uri(Ollama.GENERATE_ENDPOINT)
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono(String.class)
-            .block();
-
-    try {
-      objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
-      OllamaResponse ollamaResponse = objectMapper.readValue(response, OllamaResponse.class);
-      objectMapper.setPropertyNamingStrategy(PropertyNamingStrategies.LOWER_CAMEL_CASE);
-      log.info(objectMapper.writeValueAsString(ollamaResponse));
-      SummaryDTO summaryDTO;
-      try {
-        summaryDTO = objectMapper.readValue(ollamaResponse.getResponse(), SummaryDTO.class);
-        summaryDTO.setValidJson(true);
-        summaryDTO.setSummaryText("");
-      } catch (JsonParseException e) {
-        summaryDTO =
-            SummaryDTO.builder().summaryText(ollamaResponse.getResponse()).validJson(false).build();
-      }
-      return IssueSummary.builder()
-          .issueDTO(issue)
-          .summary(summaryDTO)
-          .updatedAt(ollamaResponse.getCreatedAt().toEpochSecond())
-          .build();
-    } catch (IOException e) {
-      log.error("Failed to parse Ollama response", e);
-      return IssueSummary.builder()
-          .issueDTO(issue)
-          .summary(SummaryDTO.builder().summaryText(response).validJson(false).build())
-          .updatedAt(ZonedDateTime.now().toEpochSecond())
-          .build();
-    }
-  }
-
-  public IssueSummaryResultListDTO getCachedOrGeneratedSummaries(int limit) {
+  public IssueSummaryResultListDTO getSummaries(int limit) {
     IssueSummaryResultListDTO cached = centralCacheService.getSummaryCache().load();
     if (cached != null) {
       log.info("Loaded {} summaries from cache", cached.getCount());
       return cached;
     }
-    return generateAndCacheSummaries(limit);
+    return generateSummaries(limit);
   }
 
-  public IssueSummaryResultListDTO generateAndCacheSummaries(int limit) {
+  public IssueSummaryResultListDTO generateSummaries(int limit) {
     try {
       runPodManager.startPod();
       runPodManager.waitForRunningPod();
 
       List<IssueDTO> issues;
-      if (centralCacheService.getIssueCache().isCacheValid()) {
+      if (centralCacheService.getIssueCache() != null) {
         issues = centralCacheService.getIssueCache().load();
       } else {
         issues = issuesService.getIssues();
       }
       List<IssueSummary> summaries =
           maybeLimit(issues.parallelStream(), limit)
-              .map(this::generateIssueSummaryUsingVllm)
+              .map(this::generateIssueSummaryUsingOpenAI)
               .filter(Objects::nonNull)
               .collect(Collectors.toList());
 
@@ -202,7 +141,7 @@ public class SummaryService {
 
   private IssueSummary generateIssueSummaryUsingOpenAI(IssueDTO issue) {
 
-    String prompt = preparePrompt(issue);
+    String prompt = promptService.preparePrompt(issue);
 
     OpenAIChatCompletionRequest request = OpenAIChatCompletionRequest.getDefaultChatRequest(prompt);
     log.info("Generating summary for issue: " + issue.getId() + " title: " + issue.getTitle());
@@ -223,12 +162,6 @@ public class SummaryService {
       OpenAIChatCompletionResponse completionResponse =
           objectMapper.readValue(responseJson, OpenAIChatCompletionResponse.class);
       log.info(completionResponse.getUsage().toString());
-
-      // TO DO:: remove code
-      OpenAIChatCompletionResponse.Usage usage = completionResponse.getUsage();
-      prompt_tokens = Math.max(prompt_tokens, usage.getPrompt_tokens());
-      total_tokens = Math.max(total_tokens, usage.getTotal_tokens());
-      completion_tokens = Math.max(completion_tokens, usage.getCompletion_tokens());
 
       // Extract the generated text from response (usually in choices[0].text or .message.content)
       String generatedText =
@@ -267,105 +200,8 @@ public class SummaryService {
     }
   }
 
-  private String preparePrompt(IssueDTO issueDTO) {
-    try {
-      String issue = objectMapper.writeValueAsString(issueDTO);
-      return getPromptTemplate() + issue;
-    } catch (JsonProcessingException e) {
-      log.debug("Json processing failed for " + issueDTO, e);
-      return String.format(
-          """
-              %s
-              - Title: %s
-              - Description: %s
-              - Labels: %s
-              - Comments: %s
-              """,
-          getPromptTemplate(),
-          issueDTO.getTitle(),
-          issueDTO.getDescription(),
-          String.join(", ", issueDTO.getLabels()),
-          issueDTO.getComments());
-    }
-  }
-
-  private IssueSummary generateIssueSummaryUsingVllm(IssueDTO issue) {
-    String prompt = preparePrompt(issue);
-    String chatCompletionUrl =
-        "https://" + runPodConfig.getPodId() + "-8000.proxy.runpod.net/v1/chat/completions";
-
-    try {
-      OpenAIChatCompletionRequest request =
-          OpenAIChatCompletionRequest.getDefaultChatRequest(prompt);
-      String responseJson =
-          webClient
-              .post()
-              .uri(chatCompletionUrl)
-              .header("Authorization", "Bearer " + runPodConfig.getVllmApiKey())
-              .bodyValue(request)
-              .retrieve()
-              .bodyToMono(String.class)
-              .block();
-
-      OpenAIChatCompletionResponse response =
-          objectMapper.readValue(responseJson, OpenAIChatCompletionResponse.class);
-
-      String resultJson =
-          response
-              .getChoices()
-              .get(0)
-              .getMessage()
-              .getTool_calls()
-              .get(0)
-              .getFunction()
-              .getArguments();
-      SummaryDTO summaryDTO;
-
-      try {
-        summaryDTO = objectMapper.readValue(resultJson, SummaryDTO.class);
-        summaryDTO.setValidJson(true);
-      } catch (JsonParseException e) {
-        summaryDTO = SummaryDTO.builder().summaryText(resultJson).validJson(false).build();
-      }
-
-      return IssueSummary.builder()
-          .issueDTO(issue)
-          .summary(summaryDTO)
-          .updatedAt(Instant.now().getEpochSecond())
-          .build();
-
-    } catch (Exception e) {
-      log.error("Failed to generate summary for issue {}", issue.getId(), e);
-      return null;
-    }
-  }
-
   private <T> Stream<T> maybeLimit(Stream<T> stream, int limit) {
     return limit > 0 ? stream.limit(limit) : stream;
   }
 
-  private String getPromptTemplate() {
-    return """
-        You are a helpful assistant summarizing GitHub issues for contributors.
-        Respond using JSON. Keep the format of your response as shown in below example else you will be heavily penalised!!!
-        Do not add your comments in the beginning like "the code summary is" or "Here is the summary of issue" or "You want to understand" or "}Summary:"
-
-        Below is a sample of summary generated for an issue.
-        Example begins now
-        {"main": "The logo at the Header component is currently off-center, affecting the overall visual alignment and aesthetics of the page. The issue needs to be fixed so that the logo is horizontally centered within the header across all screen sizes.","validationOrRequirement": "The expected behavior is for the logo to be visually centered horizontally across all screen sizes without breaking responsiveness or causing regression on other header elements.","attemptedFixes": "The fix can be implemented using Styled Components to adjust the CSS layout and ensure the logo is centered after the fix. Turning relative URLs into absolute URLs would also address the issue as noticed by user osandamaleesha in one usage-rules.md file.","otherNotes": "This issue is currently labeled as 'bug' and 'good first issue', indicating it's a significant issue suitable for a contributor to tackle. A pull request should be submitted targeting the main branch with before/after screenshots or video if possible."}
-        Example ends here
-
-        Summarize the following issue and make sure to have detailed info for each section. Do not add * in the beginning of each section else you will be heavily penalised !.
-        summary should cover:
-
-        Main-
-        validationOrRequirement-
-        attemptedFixes -
-        otherNotes -
-
-
-        GitHub Issue:
-
-        """;
-  }
 }

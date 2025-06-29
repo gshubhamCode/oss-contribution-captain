@@ -1,6 +1,8 @@
 spring:
   application:
     name : oss-contribution-helper
+  profiles:
+    active: local
 
 github:
   token: ${GITHUB_TOKEN}
