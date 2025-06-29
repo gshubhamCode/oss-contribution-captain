@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/banners")
+@RequestMapping("/api/banners")
 public class NotificationController {
 
   @Autowired private NotificationBannerService bannerService;
