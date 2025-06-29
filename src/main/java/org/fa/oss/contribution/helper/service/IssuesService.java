@@ -32,23 +32,27 @@ public class IssuesService {
       log.info("Returning cached issues from cache");
       return cachedIssues;
     }
+    return generateIssues();
 
+  }
+
+  public List<IssueDTO> generateIssues() {
     try {
       List<IssueDTO> issueDTOList = searchGoodFirstIssues();
       Map<String, RepositoryDTO> repositories =
-          repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
+              repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
 
       issueDTOList.forEach(
-          issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
+              issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
 
       List<IssueDTO> filteredIssues =
-          issueDTOList.parallelStream()
-              .filter(issueDTO -> Objects.nonNull(issueDTO.getRepository()))
-              .filter(
-                  issue ->
-                      issue.getRepository().getStargazersCount() > 15
-                          && issue.getRepository().getForksCount() > 10)
-              .collect(Collectors.toList());
+              issueDTOList.parallelStream()
+                      .filter(issueDTO -> Objects.nonNull(issueDTO.getRepository()))
+                      .filter(
+                              issue ->
+                                      issue.getRepository().getStargazersCount() > 15
+                                              && issue.getRepository().getForksCount() > 10)
+                      .collect(Collectors.toList());
       centralCacheService.getIssueCache().save(filteredIssues);
       return filteredIssues;
     } catch (IOException e) {
@@ -57,7 +61,8 @@ public class IssuesService {
     }
   }
 
-  private IssueDTO mapIssueToDTO(GHIssue issue) {
+
+    private IssueDTO mapIssueToDTO(GHIssue issue) {
     log.info("Mapping issue: {} {}", issue.getUrl(), issue.getTitle());
     String[] path = issue.getUrl().getPath().split("/");
 

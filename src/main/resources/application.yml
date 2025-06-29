@@ -20,3 +20,9 @@ runpod:
 
 cache:
   base-dir: ${user.home}/.cache/oss-captain
+
+contribution:
+  scheduler:
+    enabled: true
+    delay-ms: 7200000
+    persist-file: config/scheduler-delay.json
