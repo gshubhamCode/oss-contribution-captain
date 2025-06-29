@@ -27,13 +27,18 @@ public class RepositoryService {
             issue -> {
               String key = getRepositoryNameFromUrl(issue.getUrl());
               // Only call getRepository() if key is not in map or has null value
-                try{
-                repoMap.computeIfAbsent(key, k -> issue.getRepository());
-                }catch (Exception e){
-                  log.debug("Repo not found for issue. url: {}, issue: {}", key, issue.getHtmlUrl());
-                }
-
+              try {
+                repoMap.computeIfAbsent(
+                    key,
+                    k -> {
+                      log.info("Fetch repo:{} details for issue:{} ", key, issue.getHtmlUrl());
+                      return issue.getRepository();
+                    });
+              } catch (Exception e) {
+                log.error("Repo not found for issue. url: {}, issue: {}", key, issue.getHtmlUrl());
+              }
             });
+    log.info("Repo fetch done");
     return repoMap;
   }
 

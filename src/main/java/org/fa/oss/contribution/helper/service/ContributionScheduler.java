@@ -122,6 +122,7 @@ public class ContributionScheduler {
   }
 
   private void runJob() {
+    log.info(">>> ENTERED runJob(), isRunning: {}", isRunning.get());
     if (!isRunning.compareAndSet(false, true)) {
       log.warn("Scheduler already running.");
       return;
@@ -140,7 +141,10 @@ public class ContributionScheduler {
     } catch (Exception e) {
       log.error("Error during scheduled task", e);
     } finally {
+      log.info("Reset Scheduler status  isRunning: {}", isRunning.get());
       isRunning.set(false);
+      log.info("Reset done  isRunning: {}", isRunning.get());
+
     }
   }
 

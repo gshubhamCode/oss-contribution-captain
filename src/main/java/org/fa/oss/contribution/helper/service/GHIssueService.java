@@ -2,6 +2,8 @@ package org.fa.oss.contribution.helper.service;
 
 import java.io.IOException;
 import java.util.List;
+
+import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.config.GithubConfig;
 import org.fa.oss.contribution.helper.constants.Github;
 import org.kohsuke.github.*;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class GHIssueService {
 
   @Autowired private GithubConfig githubConfig;
@@ -17,6 +20,7 @@ public class GHIssueService {
   private long lastFetchTime = 0L;
 
   public List<GHIssue> getGHIssues() throws IOException {
+    log.info("Fetching GHIssues");
     long now = System.currentTimeMillis();
     long ttl = githubConfig.getIssuesTtlMillis();
 
@@ -28,6 +32,7 @@ public class GHIssueService {
   }
 
   public List<GHIssue> forceRefreshIssues() throws IOException {
+    log.info("Fetching issues using force refresh");
     GitHub github = new GitHubBuilder()
             .withOAuthToken(githubConfig.getToken())
             .build();

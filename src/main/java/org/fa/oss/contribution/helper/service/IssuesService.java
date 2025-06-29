@@ -39,12 +39,17 @@ public class IssuesService {
   public List<IssueDTO> generateIssues() {
     try {
       List<IssueDTO> issueDTOList = searchGoodFirstIssues();
+      log.info("Fetching repository details of issues");
       Map<String, RepositoryDTO> repositories =
               repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
+      log.info("Fetch complete");
 
+
+      log.info("Mapping repo in Issues complete");
       issueDTOList.forEach(
               issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
 
+      log.info("Filtering issues from top repo");
       List<IssueDTO> filteredIssues =
               issueDTOList.parallelStream()
                       .filter(issueDTO -> Objects.nonNull(issueDTO.getRepository()))
@@ -53,7 +58,12 @@ public class IssuesService {
                                       issue.getRepository().getStargazersCount() > 15
                                               && issue.getRepository().getForksCount() > 10)
                       .collect(Collectors.toList());
+      log.info("Filter complete");
+
+      log.info("Save Issues in cache");
       centralCacheService.getIssueCache().save(filteredIssues);
+      log.info("Saved in cache");
+
       return filteredIssues;
     } catch (IOException e) {
       log.error("Failed to fetch issues from GitHub", e);
