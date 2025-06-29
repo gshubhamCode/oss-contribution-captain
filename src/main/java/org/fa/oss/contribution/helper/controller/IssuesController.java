@@ -25,9 +25,4 @@ public class IssuesController {
     return issues.stream().toList();
   }
 
-  @GetMapping("/issues/summaries")
-  public IssueSummaryResultListDTO getSummaries() {
-    return summaryService.getCachedOrGeneratedSummaries(-1);
-  }
-
 }
