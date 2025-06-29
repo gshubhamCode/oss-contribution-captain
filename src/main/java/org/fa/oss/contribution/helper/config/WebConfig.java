@@ -12,7 +12,7 @@ public class WebConfig implements WebMvcConfigurer {
     registry
         .addMapping("/**")
         .allowedOrigins(
-            "http://localhost:5173", "https://oss-contribution-captain-ui.onrender.com/")
+            "http://localhost:5173", "https://opencontributioncaptain.com/")
         .allowedMethods("GET", "POST", "OPTIONS")
         .allowedHeaders("*")
         .allowCredentials(true); // Allow cookies/credentials if needed
