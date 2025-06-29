@@ -1,5 +1,12 @@
 <configuration>
 
+    <!-- Console appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
     <!-- 1) app.log: Daily rollover, keeps 30 days, all levels INFO+ -->
     <appender name="APP" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/app.log</file>
@@ -48,6 +55,7 @@
 
     <!-- Root logger -->
     <root level="INFO">
+        <appender-ref ref="CONSOLE" />
         <appender-ref ref="APP" />
         <appender-ref ref="ERROR_LOG" />
         <appender-ref ref="DEBUG_LOG" />
