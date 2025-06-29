@@ -228,7 +228,7 @@ public class SummaryService {
         summaryDTO.setSummaryText("");
       } catch (JsonParseException | JsonMappingException e) {
         log.error("Failed to parse generated summary text: {} error: {}", generatedText, e);
-        summaryDTO = SummaryDTO.builder().summaryText(generatedText).validJson(false).build();
+        return null;
       }
 
       return IssueSummary.builder()
