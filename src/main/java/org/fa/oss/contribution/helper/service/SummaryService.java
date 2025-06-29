@@ -193,7 +193,7 @@ public class SummaryService {
           OpenAIChatCompletionRequest.getDefaultChatRequest(prompt);
       log.info("Generating summary for issue: " + issue.getId() + " title: " + issue.getTitle());
       String chatCompletionUrl =
-          "https://" + runPodConfig.getPodId() + "-8000.proxy.runpod.net/v1/chat/completions";
+          "https://" + runPodConfig.getVllmPodId() + "-8000.proxy.runpod.net/v1/chat/completions";
       responseJson =
           webClient
               .post()

@@ -16,7 +16,7 @@ ollama:
 runpod:
   api-key: ${RUNPOD_API_KEY}
   vllm-api-Key: ${VLLM_API_KEY}
-  pod-id: ${RUNPOD_POD_ID}
+  vllm-pod-id: ${RUNPOD_VLLM_POD_ID}
 
 cache:
   base-dir: ${CACHE_DIR:/workspace/volume/cache}

@@ -14,5 +14,5 @@ public class RunPodConfig {
 
     private String apiKey;
     private String vllmApiKey;
-    private String podId;
+    private String vllmPodId;
 }

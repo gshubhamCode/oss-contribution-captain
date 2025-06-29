@@ -31,7 +31,7 @@ public class RunPodManager {
       HttpStatusCode status =
           webClient
               .post()
-              .uri("/v1/pods/" + runPodConfig.getPodId() + "/start")
+              .uri("/v1/pods/" + runPodConfig.getVllmPodId() + "/start")
               .retrieve()
               .toBodilessEntity()
               .map(response -> response.getStatusCode())
@@ -39,11 +39,11 @@ public class RunPodManager {
 
       if (status != HttpStatus.OK && status != HttpStatus.ACCEPTED) {
         throw new RuntimeException(
-            "Failed to start pod: " + runPodConfig.getPodId() + ", status: " + status);
+            "Failed to start pod: " + runPodConfig.getVllmPodId() + ", status: " + status);
       }
 
       log.info(
-          "Start request accepted for pod " + runPodConfig.getPodId() + " with status: " + status);
+          "Start request accepted for pod " + runPodConfig.getVllmPodId() + " with status: " + status);
       return true;
     } catch (WebClientResponseException e) {
       log.error("Error starting pod: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
@@ -60,7 +60,7 @@ public class RunPodManager {
       JsonNode pod =
           webClient
               .get()
-              .uri("/v1/pods/" + runPodConfig.getPodId())
+              .uri("/v1/pods/" + runPodConfig.getVllmPodId())
               .retrieve()
               .bodyToMono(JsonNode.class)
               .block();
@@ -78,7 +78,7 @@ public class RunPodManager {
     }
 
     if (ip == null) throw new RuntimeException("Pod never became ready after 40 minutes");
-    log.info("Public ip of pod {}:{}", runPodConfig.getPodId(), ip );
+    log.info("Public ip of pod {}:{}", runPodConfig.getVllmPodId(), ip );
     log.info("Waiting for 3 minutes to let LLM initialise on pod");
     Thread.sleep(180_000);
     return ip;
@@ -88,7 +88,7 @@ public class RunPodManager {
     HttpStatusCode status =
         webClient
             .post()
-            .uri("/v1/pods/" + runPodConfig.getPodId() + "/stop")
+            .uri("/v1/pods/" + runPodConfig.getVllmPodId() + "/stop")
             .retrieve()
             .toBodilessEntity()
             .map(response -> response.getStatusCode())
@@ -96,12 +96,12 @@ public class RunPodManager {
 
     if (status != HttpStatus.OK) {
       throw new RuntimeException(
-          "Failed to stop pod: " + runPodConfig.getPodId() + ", status: " + status);
+          "Failed to stop pod: " + runPodConfig.getVllmPodId() + ", status: " + status);
     }
 
     log.info(
         "Successfully sent stop request for pod: "
-            + runPodConfig.getPodId()
+            + runPodConfig.getVllmPodId()
             + " with status: "
             + status);
     return true;
