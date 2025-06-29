@@ -1,9 +1,9 @@
 package org.fa.oss.contribution.helper.service;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -99,7 +99,7 @@ public class SummaryService {
                                   issue);
                             } catch (WebClientResponseException e) {
                               log.error(
-                                  "400 Bad Request - likely context length exceeded: {}",
+                                  "Request Error - likely context length exceeded: {}",
                                   e.getResponseBodyAsString());
                               errors.add(e);
                               return null;
@@ -182,6 +182,9 @@ public class SummaryService {
   }
 
   private IssueSummary generateIssueSummaryUsingOpenAI(IssueDTO issue) {
+    String generatedText = "";
+    String responseJson = "";
+
     try {
 
       String prompt = promptService.preparePrompt(issue);
@@ -191,7 +194,7 @@ public class SummaryService {
       log.info("Generating summary for issue: " + issue.getId() + " title: " + issue.getTitle());
       String chatCompletionUrl =
           "https://" + runPodConfig.getPodId() + "-8000.proxy.runpod.net/v1/chat/completions";
-      String responseJson =
+      responseJson =
           webClient
               .post()
               .uri(chatCompletionUrl)
@@ -207,7 +210,7 @@ public class SummaryService {
       log.info(completionResponse.getUsage().toString());
 
       // Extract the generated text from response (usually in choices[0].text or .message.content)
-      String generatedText =
+      generatedText =
           completionResponse
               .getChoices()
               .get(0)
@@ -223,7 +226,8 @@ public class SummaryService {
         summaryDTO = objectMapper.readValue(generatedText, SummaryDTO.class);
         summaryDTO.setValidJson(true);
         summaryDTO.setSummaryText("");
-      } catch (JsonParseException e) {
+      } catch (JsonParseException | JsonMappingException e) {
+        log.error("Failed to parse generated summary text: {} error: {}", generatedText, e);
         summaryDTO = SummaryDTO.builder().summaryText(generatedText).validJson(false).build();
       }
 
@@ -233,8 +237,8 @@ public class SummaryService {
           .updatedAt(Instant.now().getEpochSecond())
           .build();
 
-    } catch (IOException e) {
-      log.error("Failed to parse completion response", e);
+    } catch (Exception e) {
+      log.error("Failed to parse completion response: {}  error: {}", responseJson, e);
       return null;
     }
   }
