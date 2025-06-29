@@ -1,12 +1,12 @@
 # -------- Build Stage --------
-FROM maven:3.9.6-eclipse-temurin-17 as builder
+FROM --platform=linux/amd64 maven:3.9.6-eclipse-temurin-17 as builder
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 RUN mvn clean package
 
 # -------- Run Stage --------
-FROM eclipse-temurin:17-jdk
+FROM --platform=linux/amd64 eclipse-temurin:17-jdk
 WORKDIR /app
 
 # Copy jar file after build
