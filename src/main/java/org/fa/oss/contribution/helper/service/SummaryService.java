@@ -119,6 +119,8 @@ public class SummaryService {
       } else {
         issues = issuesService.getIssues();
       }
+
+      log.info("Generating summaries");
       List<IssueSummary> summaries =
           maybeLimit(issues.parallelStream(), limit)
               .map(this::generateIssueSummaryUsingOpenAI)
@@ -128,7 +130,9 @@ public class SummaryService {
       IssueSummaryResultListDTO result =
           IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
 
+      log.info("Saving summaries in cache");
       centralCacheService.getSummaryCache().save(result);
+      log.info("Summaries saved in cache");
       return result;
 
     } catch (Exception e) {
