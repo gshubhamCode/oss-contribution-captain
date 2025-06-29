@@ -2,10 +2,8 @@ package org.fa.oss.contribution.helper.controller;
 
 import org.fa.oss.contribution.helper.dto.response.IssueDTO;
 import org.fa.oss.contribution.helper.dto.response.IssueSummaryResultListDTO;
-import org.fa.oss.contribution.helper.service.OllamaSummaryService;
 import org.fa.oss.contribution.helper.service.SummaryService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
