@@ -57,16 +57,15 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
 
   @Override
   public T load() {
-    if (!isCacheValid()) {
-      return null;
+    if (file.exists()) {
+      try {
+        firstLoadDone = true;
+        return mapper.readValue(file, typeRef);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to load cache from " + file.getAbsolutePath(), e);
+      }
     }
-
-    try {
-      firstLoadDone = true;
-      return mapper.readValue(file, typeRef);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to load cache from " + file.getAbsolutePath(), e);
-    }
+    return null;
   }
 
   public synchronized void save(T data) {
@@ -74,26 +73,37 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
 
     File tmpFile = new File(file.getAbsolutePath() + ".tmp");
 
-    try (FileOutputStream fos = new FileOutputStream(tmpFile);
-        FileChannel channel = fos.getChannel();
-        FileLock lock = channel.lock()) {
+    FileOutputStream fos = null;
+    FileLock lock = null;
+
+    try {
+      fos = new FileOutputStream(tmpFile);
+      FileChannel channel = fos.getChannel();
+
+      lock = channel.lock();
 
       mapper.writerWithDefaultPrettyPrinter().writeValue(fos, data);
       fos.flush();
       try {
-        fos.getFD().sync(); // Flush to disk for durability
+        fos.getFD().sync(); // ensure durability
       } catch (SyncFailedException e) {
         log.warn("Sync failed for " + tmpFile.getAbsolutePath(), e);
       }
 
     } catch (IOException e) {
       throw new RuntimeException("Failed to save cache atomically to " + file.getAbsolutePath(), e);
+    } finally {
+      try {
+        if (lock != null && lock.isValid()) lock.release();
+      } catch (IOException e) {
+        log.warn("Failed to release file lock: " + tmpFile.getAbsolutePath(), e);
+      }
     }
 
     if (!tmpFile.renameTo(file)) {
       throw new RuntimeException(
-              "Failed to rename temp file to cache file: " + file.getAbsolutePath());
-      }
+          "Failed to rename temp file to cache file: " + file.getAbsolutePath());
+    }
   }
 
   @Override
