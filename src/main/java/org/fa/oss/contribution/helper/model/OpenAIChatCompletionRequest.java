@@ -17,6 +17,9 @@ public class OpenAIChatCompletionRequest {
   public List<Message> messages;
   public List<Tool> tools;
   public ToolChoice tool_choice;
+  public long max_tokens;
+  public long min_tokens;
+  public long seed ;
 
   public static class Message {
     public String role;
@@ -56,6 +59,9 @@ public class OpenAIChatCompletionRequest {
     // Root object
     OpenAIChatCompletionRequest request = new OpenAIChatCompletionRequest();
     request.model = "meta-llama/Meta-Llama-3-8B-Instruct";
+    request.seed = 1237;
+    request.max_tokens = 4000;
+    request.min_tokens = 600;
 
     // Messages
     OpenAIChatCompletionRequest.Message systemMessage = new OpenAIChatCompletionRequest.Message();
