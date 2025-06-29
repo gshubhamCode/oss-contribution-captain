@@ -84,11 +84,6 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
 
       mapper.writerWithDefaultPrettyPrinter().writeValue(fos, data);
       fos.flush();
-      try {
-        fos.getFD().sync(); // ensure durability
-      } catch (SyncFailedException e) {
-        log.warn("Sync failed for " + tmpFile.getAbsolutePath(), e);
-      }
 
     } catch (IOException e) {
       throw new RuntimeException("Failed to save cache atomically to " + file.getAbsolutePath(), e);
