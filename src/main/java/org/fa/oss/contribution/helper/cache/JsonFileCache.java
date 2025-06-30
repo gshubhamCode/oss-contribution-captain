@@ -16,6 +16,7 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
   private static final long DEFAULT_MAX_AGE_MILLIS = 120 * 60 * 1000; // 120 minutes
   private final ObjectMapper mapper;
   private final File file;
+  private String filePath;
   private final TypeReference<T> typeRef;
 
   private long maxAgeMillis;
@@ -35,6 +36,7 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
     this.maxAgeMillis = maxAgeMillis;
 
     this.file.getParentFile().mkdirs();
+    this.filePath = this.file.getPath();
   }
 
   public JsonFileCache(
@@ -118,5 +120,9 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
   public long getCacheAgeMillis() {
     if (!file.exists()) return -1;
     return System.currentTimeMillis() - file.lastModified();
+  }
+
+  public String filePath(){
+    return  filePath;
   }
 }

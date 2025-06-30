@@ -7,8 +7,8 @@ spring:
 server:
   compression:
     enabled: true
-    mime-types: application/json
-    min-response-size: 1024
+    mime-types: application/json,application/json;charset=UTF-8,text/html,text/xml,text/plain
+    min-response-size: 10240
 
 github:
   token: ${GITHUB_TOKEN}

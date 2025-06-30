@@ -3,6 +3,11 @@ package org.fa.oss.contribution.helper.service;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -43,6 +48,8 @@ public class SummaryService {
 
   private static final int CONTEXT_TOKEN_LIMIT = 8192;
 
+  private String rawJson = "{}";
+
   private final WebClient webClient =
       WebClient.builder()
           .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -51,6 +58,25 @@ public class SummaryService {
                   .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(HUNDRED_MB))
                   .build())
           .build();
+
+  @Autowired
+  public SummaryService(
+          RunPodManager runPodManager,
+          RunPodConfig runPodConfig,
+          IssuesService issuesService,
+          ObjectMapper objectMapper,
+          CentralCacheService centralCacheService,
+          PromptService promptService
+  ) {
+    this.runPodManager = runPodManager;
+    this.runPodConfig = runPodConfig;
+    this.issuesService = issuesService;
+    this.objectMapper = objectMapper;
+    this.centralCacheService = centralCacheService;
+    this.promptService = promptService;
+    reloadRawSummary();
+  }
+
 
   public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
     final ExecutorService ioExecutor = Executors.newFixedThreadPool(8);
@@ -165,6 +191,20 @@ public class SummaryService {
     return generateSummaries(limit);
   }
 
+  private void reloadRawSummary() {
+    try {
+      if (new File(centralCacheService.getSummaryCache().filePath()).exists()) {
+        rawJson = Files.readString(Path.of(centralCacheService.getSummaryCache().filePath()));
+      }
+    } catch (IOException e) {
+      log.error("Summary load failed", e);
+    }
+  }
+
+  public String generateSummariesRaw(int limit) throws IOException {
+    return rawJson;
+  }
+
   public IssueSummaryResultListDTO generateSummaries(int limit) {
     List<IssueDTO> issues;
     if (centralCacheService.getIssueCache() != null) {
@@ -175,7 +215,9 @@ public class SummaryService {
 
     List<IssueDTO> filteredIssues = maybeLimit(issues.stream(), limit).collect(Collectors.toList());
 
-    return generateSummaries(filteredIssues);
+    IssueSummaryResultListDTO issueSummaryResultListDTO =  generateSummaries(filteredIssues);
+    reloadRawSummary();
+    return issueSummaryResultListDTO;
   }
 
   private IssueSummary generateIssueSummaryUsingOpenAI(IssueDTO issue) {
