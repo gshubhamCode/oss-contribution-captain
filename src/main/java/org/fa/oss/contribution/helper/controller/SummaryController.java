@@ -2,7 +2,6 @@ package org.fa.oss.contribution.helper.controller;
 
 import java.io.IOException;
 import java.util.List;
-
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.dto.response.IssueDTO;
 import org.fa.oss.contribution.helper.dto.response.IssueSummaryResultListDTO;
@@ -20,16 +19,16 @@ public class SummaryController {
   @Autowired private SummaryService summaryService;
 
   @GetMapping
-  public ResponseEntity<String> getCachedSummaries(@RequestParam(defaultValue = "0") int limit, @RequestParam(defaultValue = "true") boolean raw) {
+  public ResponseEntity<String> getCachedSummaries(
+      @RequestParam(defaultValue = "0") int limit,
+      @RequestParam(defaultValue = "true") boolean raw) {
     String rawJson = "{}";
     try {
-       rawJson = summaryService.generateSummariesRaw(limit);
+      rawJson = summaryService.generateSummariesRaw(limit);
     } catch (IOException e) {
       log.error("Failed in fetching Raw summary", e);
     }
-    return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(rawJson);
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(rawJson);
   }
 
   @GetMapping("/refresh")

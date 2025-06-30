@@ -3,12 +3,13 @@ package org.fa.oss.contribution.helper.service;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.cache.CentralCacheService;
+import org.fa.oss.contribution.helper.config.GithubConfig;
 import org.fa.oss.contribution.helper.config.RunPodConfig;
 import org.fa.oss.contribution.helper.dto.response.IssueDTO;
 import org.fa.oss.contribution.helper.dto.response.IssueSummaryResultListDTO;
@@ -44,6 +46,8 @@ public class SummaryService {
 
   @Autowired private PromptService promptService;
 
+  @Autowired private GithubConfig githubConfig;
+
   private static final int HUNDRED_MB = 100 * 1024 * 1024;
 
   private static final int CONTEXT_TOKEN_LIMIT = 8192;
@@ -61,13 +65,12 @@ public class SummaryService {
 
   @Autowired
   public SummaryService(
-          RunPodManager runPodManager,
-          RunPodConfig runPodConfig,
-          IssuesService issuesService,
-          ObjectMapper objectMapper,
-          CentralCacheService centralCacheService,
-          PromptService promptService
-  ) {
+      RunPodManager runPodManager,
+      RunPodConfig runPodConfig,
+      IssuesService issuesService,
+      ObjectMapper objectMapper,
+      CentralCacheService centralCacheService,
+      PromptService promptService) {
     this.runPodManager = runPodManager;
     this.runPodConfig = runPodConfig;
     this.issuesService = issuesService;
@@ -76,7 +79,6 @@ public class SummaryService {
     this.promptService = promptService;
     reloadRawSummary();
   }
-
 
   public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
     final ExecutorService ioExecutor = Executors.newFixedThreadPool(8);
@@ -215,9 +217,26 @@ public class SummaryService {
 
     List<IssueDTO> filteredIssues = maybeLimit(issues.stream(), limit).collect(Collectors.toList());
 
-    IssueSummaryResultListDTO issueSummaryResultListDTO =  generateSummaries(filteredIssues);
+    IssueSummaryResultListDTO issueSummaryResultListDTO = generateSummaries(filteredIssues);
+    uploadSummaryJSONToCDN();
     reloadRawSummary();
     return issueSummaryResultListDTO;
+  }
+
+  private void uploadSummaryJSONToCDN() {
+    try {
+
+      DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+      String timestamp = LocalDateTime.now().format(formatter);
+      String commitMessage = "Update summaries.json at " + timestamp;
+
+      GitHubUploader uploader =
+          new GitHubUploader(githubConfig.getToken(), githubConfig.getSummaryCdnRepo());
+      uploader.uploadJsonFile(
+          centralCacheService.getSummaryCache().filePath(), "summaries.json", commitMessage);
+    } catch (Exception e) {
+      log.error("Upload failed: Unable to commit summaries.json to GitHub repo summary-cdn'.", e);
+    }
   }
 
   private IssueSummary generateIssueSummaryUsingOpenAI(IssueDTO issue) {

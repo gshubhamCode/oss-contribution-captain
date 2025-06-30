@@ -122,7 +122,7 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
     return System.currentTimeMillis() - file.lastModified();
   }
 
-  public String filePath(){
-    return  filePath;
+  public String filePath() {
+    return filePath;
   }
 }

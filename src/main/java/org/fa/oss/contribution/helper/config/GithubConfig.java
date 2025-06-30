@@ -13,6 +13,7 @@ public class GithubConfig {
 
   public String token;
   private long issuesTtlMillis;
+  public String summaryCdnRepo;
 
   public String getToken() {
     return token;

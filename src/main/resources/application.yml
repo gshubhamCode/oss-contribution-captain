@@ -13,6 +13,7 @@ server:
 github:
   token: ${GITHUB_TOKEN}
   issues-ttl-millis: 3600000
+  summary-cdn-repo: ${SUMMARY_CDN_REPO:gshubhamCode/summary-cdn}
 
 ollama:
   url: http://localhost
