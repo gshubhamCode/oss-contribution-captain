@@ -11,33 +11,32 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class PromptService {
 
-    @Autowired
-    private ObjectMapper objectMapper;
+  @Autowired private ObjectMapper objectMapper;
 
-    public String preparePrompt(IssueDTO issueDTO) {
-        try {
-            String issue = objectMapper.writeValueAsString(issueDTO);
-            return getPromptTemplate() + issue;
-        } catch (JsonProcessingException e) {
-            log.debug("Json processing failed for " + issueDTO, e);
-            return String.format(
-                    """
+  public String preparePrompt(IssueDTO issueDTO) {
+    try {
+      String issue = objectMapper.writeValueAsString(issueDTO);
+      return getPromptTemplate() + issue;
+    } catch (JsonProcessingException e) {
+      log.debug("Json processing failed for " + issueDTO, e);
+      return String.format(
+          """
                         %s
                         - Title: %s
                         - Description: %s
                         - Labels: %s
                         - Comments: %s
                         """,
-                    getPromptTemplate(),
-                    issueDTO.getTitle(),
-                    issueDTO.getDescription(),
-                    String.join(", ", issueDTO.getLabels()),
-                    issueDTO.getComments());
-        }
+          getPromptTemplate(),
+          issueDTO.getTitle(),
+          issueDTO.getDescription(),
+          String.join(", ", issueDTO.getLabels()),
+          issueDTO.getComments());
     }
+  }
 
-    private String getPromptTemplate() {
-        return """
+  private String getPromptTemplate() {
+    return """
         You are a helpful assistant summarizing GitHub issues for contributors.
         Respond using JSON. Keep the format of your response as shown in below example else you will be heavily penalised!!!
         Do not add your comments in the beginning like "the code summary is" or "Here is the summary of issue" or "You want to understand" or "}Summary:"
@@ -59,5 +58,5 @@ public class PromptService {
         GitHub Issue:
 
         """;
-    }
+  }
 }

@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NotificationBanner {
-    private String id;
-    private String message;
-    private long timestamp;   // Time it was added
-    private long expiryTime;  // Time after which it should disappear
+  private String id;
+  private String message;
+  private long timestamp; // Time it was added
+  private long expiryTime; // Time after which it should disappear
 
-    // Getters/setters/constructors
+  // Getters/setters/constructors
 }

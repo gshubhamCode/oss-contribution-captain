@@ -1,9 +1,8 @@
 package org.fa.oss.contribution.helper.dto.request;
 
+import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
-
-import java.util.Map;
 
 @Data
 @Builder

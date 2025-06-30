@@ -3,12 +3,6 @@ package org.fa.oss.contribution.helper.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import lombok.extern.slf4j.Slf4j;
-import org.fa.oss.contribution.helper.config.ContributionSchedulerProperties;
-import org.fa.oss.contribution.helper.dto.response.SchedulerStatusDTO;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Executors;
@@ -16,6 +10,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
+import org.fa.oss.contribution.helper.config.ContributionSchedulerProperties;
+import org.fa.oss.contribution.helper.dto.response.SchedulerStatusDTO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
@@ -31,9 +30,7 @@ public class ContributionScheduler {
   private long currentDelayMs;
   private long lastRunTime = -1;
 
-  @Autowired
-  private ObjectMapper objectMapper;
-
+  @Autowired private ObjectMapper objectMapper;
 
   @Autowired
   public ContributionScheduler(
@@ -44,11 +41,9 @@ public class ContributionScheduler {
     this.issueService = issueService;
     this.contributionSchedulerProperties = properties;
     this.currentDelayMs = properties.getDelayMs();
-
   }
 
   private record DelayWrapper(long delayMs) {}
-
 
   @PostConstruct
   public void startScheduler() {
@@ -58,7 +53,6 @@ public class ContributionScheduler {
     }
 
     executor = Executors.newSingleThreadScheduledExecutor();
-
 
     // Load persisted delay if available
     File persistFile = new File(contributionSchedulerProperties.getPersistFile());
@@ -112,7 +106,9 @@ public class ContributionScheduler {
   }
 
   public void resetDelayToDefault() {
-    log.info("Resetting scheduler delay to default ({} ms)", contributionSchedulerProperties.getDelayMs());
+    log.info(
+        "Resetting scheduler delay to default ({} ms)",
+        contributionSchedulerProperties.getDelayMs());
     scheduleWithDelay(contributionSchedulerProperties.getDelayMs());
   }
 
@@ -144,16 +140,14 @@ public class ContributionScheduler {
       log.info("Reset Scheduler status  isRunning: {}", isRunning.get());
       isRunning.set(false);
       log.info("Reset done  isRunning: {}", isRunning.get());
-
     }
   }
 
   public SchedulerStatusDTO getStatus() {
     return new SchedulerStatusDTO(
-            contributionSchedulerProperties.isEnabled(),
-            currentDelayMs,
-            contributionSchedulerProperties.getDelayMs(),
-            lastRunTime
-    );
+        contributionSchedulerProperties.isEnabled(),
+        currentDelayMs,
+        contributionSchedulerProperties.getDelayMs(),
+        lastRunTime);
   }
 }

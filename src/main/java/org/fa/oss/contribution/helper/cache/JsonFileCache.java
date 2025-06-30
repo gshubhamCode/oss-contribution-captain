@@ -2,15 +2,13 @@ package org.fa.oss.contribution.helper.cache;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.fa.oss.contribution.helper.config.CacheProperties;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.SyncFailedException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import lombok.extern.slf4j.Slf4j;
+import org.fa.oss.contribution.helper.config.CacheProperties;
 
 @Slf4j
 public abstract class JsonFileCache<T> implements CacheService<T> {
@@ -23,7 +21,6 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
   private long maxAgeMillis;
 
   protected boolean firstLoadDone = false;
-
 
   public JsonFileCache(
       ObjectMapper mapper,
@@ -107,9 +104,9 @@ public abstract class JsonFileCache<T> implements CacheService<T> {
   public boolean isCacheValid() {
     if (!file.exists()) return false;
 
-    if(!firstLoadDone){
+    if (!firstLoadDone) {
       return true;
-      }
+    }
 
     long lastModified = file.lastModified();
     long age = System.currentTimeMillis() - lastModified;

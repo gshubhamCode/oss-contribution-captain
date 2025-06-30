@@ -33,7 +33,6 @@ public class IssuesService {
       return cachedIssues;
     }
     return generateIssues();
-
   }
 
   public List<IssueDTO> generateIssues() {
@@ -41,23 +40,22 @@ public class IssuesService {
       List<IssueDTO> issueDTOList = searchGoodFirstIssues();
       log.info("Fetching repository details of issues");
       Map<String, RepositoryDTO> repositories =
-              repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
+          repositoryService.mapToRepositoryDTO(repositoryService.getRepositoryForIssues());
       log.info("Fetch complete");
-
 
       log.info("Mapping repo in Issues complete");
       issueDTOList.forEach(
-              issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
+          issue -> issue.setRepository(repositories.get(issue.getRepositoryName())));
 
       log.info("Filtering issues from top repo");
       List<IssueDTO> filteredIssues =
-              issueDTOList.parallelStream()
-                      .filter(issueDTO -> Objects.nonNull(issueDTO.getRepository()))
-                      .filter(
-                              issue ->
-                                      issue.getRepository().getStargazersCount() > 15
-                                              && issue.getRepository().getForksCount() > 10)
-                      .collect(Collectors.toList());
+          issueDTOList.parallelStream()
+              .filter(issueDTO -> Objects.nonNull(issueDTO.getRepository()))
+              .filter(
+                  issue ->
+                      issue.getRepository().getStargazersCount() > 15
+                          && issue.getRepository().getForksCount() > 10)
+              .collect(Collectors.toList());
       log.info("Filter complete");
 
       log.info("Save Issues in cache");
@@ -71,8 +69,7 @@ public class IssuesService {
     }
   }
 
-
-    private IssueDTO mapIssueToDTO(GHIssue issue) {
+  private IssueDTO mapIssueToDTO(GHIssue issue) {
     log.info("Mapping issue: {} {}", issue.getUrl(), issue.getTitle());
     String[] path = issue.getUrl().getPath().split("/");
 

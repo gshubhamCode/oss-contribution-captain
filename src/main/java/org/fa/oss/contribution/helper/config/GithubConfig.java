@@ -14,7 +14,6 @@ public class GithubConfig {
   public String token;
   private long issuesTtlMillis;
 
-
   public String getToken() {
     return token;
   }

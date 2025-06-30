@@ -10,33 +10,31 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/scheduler")
 public class SchedulerController {
 
-    @Autowired
-    private  ContributionScheduler scheduler;
+  @Autowired private ContributionScheduler scheduler;
 
-    @GetMapping("/status")
-    public SchedulerStatusDTO getStatus() {
-        return scheduler.getStatus();
-    }
+  @GetMapping("/status")
+  public SchedulerStatusDTO getStatus() {
+    return scheduler.getStatus();
+  }
 
-    @PostMapping("/set-delay")
-    public ResponseEntity<String> setDelay(@RequestParam long delayMs) {
-        if (delayMs < 60_000) {
-            return ResponseEntity.badRequest().body("Minimum delay is 60,000 ms");
-        }
-        scheduler.updateDelay(delayMs);
-        return ResponseEntity.ok("Updated delay to " + delayMs);
+  @PostMapping("/set-delay")
+  public ResponseEntity<String> setDelay(@RequestParam long delayMs) {
+    if (delayMs < 60_000) {
+      return ResponseEntity.badRequest().body("Minimum delay is 60,000 ms");
     }
+    scheduler.updateDelay(delayMs);
+    return ResponseEntity.ok("Updated delay to " + delayMs);
+  }
 
-    @PostMapping("/reset-delay")
-    public ResponseEntity<String> resetDelay() {
-        scheduler.resetDelayToDefault();
-        return ResponseEntity.ok("Reset delay to default");
-    }
+  @PostMapping("/reset-delay")
+  public ResponseEntity<String> resetDelay() {
+    scheduler.resetDelayToDefault();
+    return ResponseEntity.ok("Reset delay to default");
+  }
 
-    @PostMapping("/run-now")
-    public ResponseEntity<String> runNow() {
-        scheduler.runNow();
-        return ResponseEntity.ok("Scheduler job triggered manually.");
-    }
+  @PostMapping("/run-now")
+  public ResponseEntity<String> runNow() {
+    scheduler.runNow();
+    return ResponseEntity.ok("Scheduler job triggered manually.");
+  }
 }
-

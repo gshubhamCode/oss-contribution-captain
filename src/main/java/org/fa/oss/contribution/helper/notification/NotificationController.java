@@ -1,12 +1,11 @@
 package org.fa.oss.contribution.helper.notification;
 
+import java.util.List;
 import org.fa.oss.contribution.helper.notification.model.NotificationBanner;
 import org.fa.oss.contribution.helper.notification.service.NotificationBannerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/banners")

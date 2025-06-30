@@ -6,14 +6,13 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "cache")
 public class CacheProperties {
-    private String baseDir;
+  private String baseDir;
 
-    public String getBaseDir() {
-        return baseDir;
-    }
+  public String getBaseDir() {
+    return baseDir;
+  }
 
-    public void setBaseDir(String baseDir) {
-        this.baseDir = baseDir;
-    }
+  public void setBaseDir(String baseDir) {
+    this.baseDir = baseDir;
+  }
 }
-

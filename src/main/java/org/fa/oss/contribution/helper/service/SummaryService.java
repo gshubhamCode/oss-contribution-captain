@@ -3,7 +3,6 @@ package org.fa.oss.contribution.helper.service;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -11,7 +10,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.cache.CentralCacheService;
 import org.fa.oss.contribution.helper.config.RunPodConfig;
@@ -95,8 +93,7 @@ public class SummaryService {
                       CompletableFuture.supplyAsync(
                           () -> {
                             try {
-                              return generateIssueSummaryUsingOpenAI(
-                                  issue);
+                              return generateIssueSummaryUsingOpenAI(issue);
                             } catch (WebClientResponseException e) {
                               log.error(
                                   "Request Error - likely context length exceeded: {}",

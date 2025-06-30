@@ -18,9 +18,8 @@ public class IssuesController {
   @Autowired private SummaryService summaryService;
 
   @GetMapping("/issues")
-  public List<IssueDTO> getIssues()  {
+  public List<IssueDTO> getIssues() {
     List<IssueDTO> issues = issuesService.getIssues();
     return issues.stream().toList();
   }
-
 }

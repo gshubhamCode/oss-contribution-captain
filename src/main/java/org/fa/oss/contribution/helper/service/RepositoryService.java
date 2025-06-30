@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.dto.response.OwnerDTO;
 import org.fa.oss.contribution.helper.dto.response.RepositoryDTO;

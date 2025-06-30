@@ -2,7 +2,6 @@ package org.fa.oss.contribution.helper.service;
 
 import java.io.IOException;
 import java.util.List;
-
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.config.GithubConfig;
 import org.fa.oss.contribution.helper.constants.Github;
@@ -33,11 +32,11 @@ public class GHIssueService {
 
   public List<GHIssue> forceRefreshIssues() throws IOException {
     log.info("Fetching issues using force refresh");
-    GitHub github = new GitHubBuilder()
-            .withOAuthToken(githubConfig.getToken())
-            .build();
+    GitHub github = new GitHubBuilder().withOAuthToken(githubConfig.getToken()).build();
 
-    PagedSearchIterable<GHIssue> results = github.searchIssues()
+    PagedSearchIterable<GHIssue> results =
+        github
+            .searchIssues()
             .q("label:\"good first issue\" state:open is:issue")
             .sort(GHIssueSearchBuilder.Sort.UPDATED)
             .order(GHDirection.DESC)

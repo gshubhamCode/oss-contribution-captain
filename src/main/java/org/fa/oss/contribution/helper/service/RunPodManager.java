@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-
 @Slf4j
 @Service
 public class RunPodManager {
@@ -43,7 +42,10 @@ public class RunPodManager {
       }
 
       log.info(
-          "Start request accepted for pod " + runPodConfig.getVllmPodId() + " with status: " + status);
+          "Start request accepted for pod "
+              + runPodConfig.getVllmPodId()
+              + " with status: "
+              + status);
       return true;
     } catch (WebClientResponseException e) {
       log.error("Error starting pod: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
@@ -67,18 +69,19 @@ public class RunPodManager {
 
       status = pod.get("desiredStatus").asText();
       ip = pod.get("publicIp").asText();
-      if ("RUNNING".equals(status) && ip!= null && !ip.trim().equals("")) {
+      if ("RUNNING".equals(status) && ip != null && !ip.trim().equals("")) {
         ip = pod.get("publicIp").asText();
         break;
       }
       log.warn(
           "Attempt {}: Pod status (status={}). Pod public ip not available yet. Waiting 1 minute before retry.",
-          i + 1, status);
+          i + 1,
+          status);
       Thread.sleep(60_000);
     }
 
     if (ip == null) throw new RuntimeException("Pod never became ready after 40 minutes");
-    log.info("Public ip of pod {}:{}", runPodConfig.getVllmPodId(), ip );
+    log.info("Public ip of pod {}:{}", runPodConfig.getVllmPodId(), ip);
     log.info("Waiting for 3 minutes to let LLM initialise on pod");
     Thread.sleep(180_000);
     return ip;
