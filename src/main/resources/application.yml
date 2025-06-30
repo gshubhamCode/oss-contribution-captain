@@ -4,6 +4,12 @@ spring:
   profiles:
     active: local
 
+server:
+  compression:
+    enabled: true
+    mime-types: application/json
+    min-response-size: 1024
+
 github:
   token: ${GITHUB_TOKEN}
   issues-ttl-millis: 3600000
