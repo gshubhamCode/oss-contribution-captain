@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.config.ContributionSchedulerProperties;
+import org.fa.oss.contribution.helper.config.RunPodConfig;
 import org.fa.oss.contribution.helper.dto.response.SchedulerStatusDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,9 @@ public class ContributionScheduler {
 
   private SummaryService summaryService;
   private IssuesService issueService;
+  private RunPodManager runPodManager;
+
+  private RunPodConfig runPodConfig;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   private final ContributionSchedulerProperties contributionSchedulerProperties;
 
@@ -36,10 +40,14 @@ public class ContributionScheduler {
   public ContributionScheduler(
       IssuesService issueService,
       SummaryService summaryService,
-      ContributionSchedulerProperties properties) {
+      ContributionSchedulerProperties properties,
+      RunPodManager runPodManager,
+      RunPodConfig runPodConfig) {
     this.summaryService = summaryService;
     this.issueService = issueService;
     this.contributionSchedulerProperties = properties;
+    this.runPodManager = runPodManager;
+    this.runPodConfig = runPodConfig;
     this.currentDelayMs = properties.getDelayMs();
   }
 
@@ -140,6 +148,7 @@ public class ContributionScheduler {
       log.info("Reset Scheduler status  isRunning: {}", isRunning.get());
       isRunning.set(false);
       log.info("Reset done  isRunning: {}", isRunning.get());
+      runPodManager.deletePod(runPodConfig.getSelfPodId());
     }
   }
 

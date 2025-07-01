@@ -109,4 +109,27 @@ public class RunPodManager {
             + status);
     return true;
   }
+
+  public boolean deletePod(String podId) {
+    try {
+      HttpStatusCode status =
+          webClient
+              .delete()
+              .uri("/v1/pods/" + podId)
+              .retrieve()
+              .toBodilessEntity()
+              .map(response -> response.getStatusCode())
+              .block();
+
+      if (status != HttpStatus.NO_CONTENT && status != HttpStatus.OK) {
+        throw new RuntimeException("Failed to delete pod: " + podId + ", status: " + status);
+      }
+
+      log.info("Successfully deleted pod: " + podId + " with status: " + status);
+      return true;
+    } catch (WebClientResponseException e) {
+      log.error("Error deleting pod: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
+      throw e;
+    }
+  }
 }
