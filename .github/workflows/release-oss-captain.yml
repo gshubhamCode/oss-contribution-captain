@@ -73,3 +73,4 @@ jobs:
           asset_path: ${{ steps.find_jar.outputs.JARFILE }}
           asset_name: app.jar
           asset_content_type: application/java-archive
+          token: ${{ secrets.PAT_TOKEN }}
