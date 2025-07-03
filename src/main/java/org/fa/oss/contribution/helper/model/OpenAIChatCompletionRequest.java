@@ -40,6 +40,7 @@ public class OpenAIChatCompletionRequest {
 
   public static class Property {
     public String type;
+    public String description;
   }
 
   public static class ToolChoice {
@@ -69,15 +70,28 @@ public class OpenAIChatCompletionRequest {
     request.messages = Arrays.asList(systemMessage, userMessage);
 
     // Tool Function Parameters
-    OpenAIChatCompletionRequest.Property stringProperty =
-        new OpenAIChatCompletionRequest.Property();
-    stringProperty.type = "string";
-
     Map<String, OpenAIChatCompletionRequest.Property> properties = new HashMap<>();
-    properties.put("main", stringProperty);
-    properties.put("validationOrRequirement", stringProperty);
-    properties.put("attemptedFixes", stringProperty);
-    properties.put("otherNotes", stringProperty);
+
+    OpenAIChatCompletionRequest.Property mainProp = new OpenAIChatCompletionRequest.Property();
+    mainProp.type = "string";
+    mainProp.description = "A brief summary of the main goal or objective of the GitHub issue";
+    properties.put("main", mainProp);
+
+    OpenAIChatCompletionRequest.Property validationProp =
+        new OpenAIChatCompletionRequest.Property();
+    validationProp.type = "string";
+    validationProp.description = "Any validations, constraints, or specific requirements mentioned";
+    properties.put("validationOrRequirement", validationProp);
+
+    OpenAIChatCompletionRequest.Property fixesProp = new OpenAIChatCompletionRequest.Property();
+    fixesProp.type = "string";
+    fixesProp.description = "Any fixes attempted, blockers encountered, or partial progress made";
+    properties.put("attemptedFixes", fixesProp);
+
+    OpenAIChatCompletionRequest.Property notesProp = new OpenAIChatCompletionRequest.Property();
+    notesProp.type = "string";
+    notesProp.description = "Additional context or comments that may help the contributor";
+    properties.put("otherNotes", notesProp);
 
     OpenAIChatCompletionRequest.Parameters parameters =
         new OpenAIChatCompletionRequest.Parameters();

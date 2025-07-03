@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -14,6 +15,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 @Service
 @Slf4j
@@ -81,10 +85,113 @@ public class SummaryService {
   }
 
   public IssueSummaryResultListDTO generateSummaries(List<IssueDTO> issueDTOS) {
-    final ExecutorService ioExecutor = Executors.newFixedThreadPool(8);
+    final ExecutorService ioExecutor = Executors.newFixedThreadPool(1);
     try {
       runPodManager.startPod();
       runPodManager.waitForRunningPod();
+      List<IssueDTO> filteredIssues =
+          issueDTOS.parallelStream()
+              .filter(
+                  issue -> {
+                    try {
+                      String prompt = promptService.preparePrompt(issue);
+                      long tokenCount = TokenCounter.countTokens(prompt);
+                      if (tokenCount < CONTEXT_TOKEN_LIMIT) {
+                        return true;
+                      } else {
+                        log.warn(
+                            "Token check failed. issue: {}, token count: {}, limit: {}",
+                            issue.getUrl(),
+                            tokenCount,
+                            CONTEXT_TOKEN_LIMIT);
+                        return false;
+                      }
+                    } catch (Exception e) {
+                      log.error(
+                          "Token check failed due to exception for issue {}: {}",
+                          issue.getUrl(),
+                          e.getMessage(),
+                          e);
+                      return false;
+                    }
+                  })
+              .collect(Collectors.toList());
+
+      List<Throwable> errors = Collections.synchronizedList(new ArrayList<>());
+      List<CompletableFuture<IssueSummary>> futures =
+          filteredIssues.stream()
+              .map(
+                  issue ->
+                      CompletableFuture.supplyAsync(
+                          () -> {
+                            try {
+                              return generateIssueSummaryUsingOpenAI(issue);
+                            } catch (WebClientResponseException e) {
+                              log.error(
+                                  "Request Error - likely context length exceeded: {}",
+                                  e.getResponseBodyAsString());
+                              errors.add(e);
+                              return null;
+                            } catch (Exception e) {
+                              errors.add(e);
+                              log.error(
+                                  "Skipping issue due to exception: {} {}",
+                                  issue.getId(),
+                                  issue.getTitle(),
+                                  e);
+                              return null;
+                            }
+                          },
+                          ioExecutor))
+              .collect(Collectors.toList());
+
+      List<IssueSummary> summaries =
+          futures.stream()
+              .map(
+                  future -> {
+                    try {
+                      return future.get(); // or future.join() if you prefer unchecked
+                    } catch (Exception e) {
+                      log.error("Error while generating summary", e);
+                      errors.add(e);
+                      return null;
+                    }
+                  })
+              .filter(Objects::nonNull)
+              .collect(Collectors.toList());
+
+      if (!errors.isEmpty()) {
+        log.error("Summary generation completed with {} errors", errors.size());
+      }
+
+      IssueSummaryResultListDTO result =
+          IssueSummaryResultListDTO.builder().summaries(summaries).count(summaries.size()).build();
+      log.info("Saving summaries in cache");
+      centralCacheService.getSummaryCache().save(result);
+      log.info("Summaries saved in cache");
+      return result;
+
+    } catch (Exception e) {
+      log.error("Failed to generate summaries", e);
+      return IssueSummaryResultListDTO.builder()
+          .summaries(Collections.emptyList())
+          .count(Collections.emptyList().size())
+          .build();
+    } finally {
+      try {
+        runPodManager.stopPod();
+      } catch (Exception ex) {
+        log.warn("Error stopping pod", ex);
+      }
+      if (ioExecutor != null) {
+        ioExecutor.shutdown();
+      }
+    }
+  }
+
+  public IssueSummaryResultListDTO generateSummary(List<IssueDTO> issueDTOS) {
+    final ExecutorService ioExecutor = Executors.newFixedThreadPool(1);
+    try {
       List<IssueDTO> filteredIssues =
           issueDTOS.parallelStream()
               .filter(
@@ -173,11 +280,7 @@ public class SummaryService {
           .count(Collections.emptyList().size())
           .build();
     } finally {
-      try {
-        runPodManager.stopPod();
-      } catch (Exception ex) {
-        log.warn("Error stopping pod", ex);
-      }
+
       if (ioExecutor != null) {
         ioExecutor.shutdown();
       }
@@ -234,6 +337,7 @@ public class SummaryService {
           new GitHubUploader(githubConfig.getToken(), githubConfig.getSummaryCdnRepo());
       uploader.uploadJsonFile(
           centralCacheService.getSummaryCache().filePath(), "summaries.json", commitMessage);
+      log.info("Uploaded summaries.json to gshubhamcode/summary-cdn");
     } catch (Exception e) {
       log.error("Upload failed: Unable to commit summaries.json to GitHub repo summary-cdn'.", e);
     }
@@ -252,15 +356,45 @@ public class SummaryService {
       log.info("Generating summary for issue: " + issue.getId() + " title: " + issue.getTitle());
       String chatCompletionUrl =
           "https://" + runPodConfig.getVllmPodId() + "-8000.proxy.runpod.net/v1/chat/completions";
-      responseJson =
+
+      log.info("Request body: {}", objectMapper.writeValueAsString(request));
+
+      Mono<String> responseMono =
           webClient
               .post()
               .uri(chatCompletionUrl)
               .header("Authorization", "Bearer " + runPodConfig.getVllmApiKey())
               .bodyValue(request)
               .retrieve()
+              .onStatus(
+                  status -> status.is5xxServerError() || status.value() == 504,
+                  clientResponse ->
+                      clientResponse
+                          .bodyToMono(String.class)
+                          .defaultIfEmpty("Unknown error")
+                          .flatMap(
+                              errorBody -> {
+                                System.err.println("Server error: " + errorBody);
+                                return Mono.error(
+                                    new RuntimeException("Server error: " + errorBody));
+                              }))
               .bodyToMono(String.class)
-              .block();
+              .timeout(Duration.ofSeconds(60)) // hard timeout
+              .retryWhen(
+                  Retry.backoff(3, Duration.ofSeconds(5))
+                      .filter(
+                          throwable ->
+                              throwable instanceof TimeoutException
+                                  || throwable instanceof WebClientResponseException.BadGateway
+                                  || throwable instanceof WebClientResponseException.GatewayTimeout
+                                  || (throwable instanceof WebClientResponseException
+                                      && ((WebClientResponseException) throwable)
+                                          .getStatusCode()
+                                          .is5xxServerError()))
+                      .onRetryExhaustedThrow(
+                          (retryBackoffSpec, retrySignal) -> retrySignal.failure()));
+
+      responseJson = responseMono.block(); // blocking for final value
 
       // Parse the vLLM / OpenAI completion response
       OpenAIChatCompletionResponse completionResponse =

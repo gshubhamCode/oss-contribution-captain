@@ -141,6 +141,7 @@ public class ContributionScheduler {
       log.info("Starting scheduled summary generation...");
       summaryService.generateSummaries(0);
       log.info("Summary generation complete.");
+      runPodManager.deletePod(runPodConfig.getSelfPodId());
 
     } catch (Exception e) {
       log.error("Error during scheduled task", e);
@@ -148,7 +149,6 @@ public class ContributionScheduler {
       log.info("Reset Scheduler status  isRunning: {}", isRunning.get());
       isRunning.set(false);
       log.info("Reset done  isRunning: {}", isRunning.get());
-      runPodManager.deletePod(runPodConfig.getSelfPodId());
     }
   }
 

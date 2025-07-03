@@ -38,6 +38,6 @@ public class SummaryController {
 
   @PostMapping
   public IssueSummaryResultListDTO getSummary(@RequestBody List<IssueDTO> issueDTO) {
-    return summaryService.generateSummaries(issueDTO);
+    return summaryService.generateSummary(issueDTO);
   }
 }
