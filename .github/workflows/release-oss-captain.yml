@@ -66,11 +66,9 @@ jobs:
           echo "Found jar file: $jarfile"
           echo "JARFILE=$jarfile" >> $GITHUB_OUTPUT
 
-      - name: Upload Jar to Release
-        uses: actions/upload-release-asset@v1
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.find_jar.outputs.JARFILE }}
-          asset_name: app.jar
-          asset_content_type: application/java-archive
-          token: ${{ secrets.PAT_TOKEN }}
+          files: ${{ steps.find_jar.outputs.JARFILE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }} 
