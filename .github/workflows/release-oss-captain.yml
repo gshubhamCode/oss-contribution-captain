@@ -54,6 +54,7 @@ jobs:
         id: find_jar
         run: |
           jarfile=$(ls target/*.jar | head -n 1)
+          echo "Found jar file: $jarfile"
           echo "JARFILE=$jarfile" >> $GITHUB_OUTPUT
 
       - name: Upload Jar to Release
