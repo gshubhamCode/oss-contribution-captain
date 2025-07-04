@@ -5,6 +5,8 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.File;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -12,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.fa.oss.contribution.helper.config.ContributionSchedulerProperties;
+import org.fa.oss.contribution.helper.config.GithubConfig;
 import org.fa.oss.contribution.helper.config.RunPodConfig;
 import org.fa.oss.contribution.helper.dto.response.SchedulerStatusDTO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,10 @@ public class ContributionScheduler {
   private RunPodManager runPodManager;
 
   private RunPodConfig runPodConfig;
+
+
+  @Autowired
+  private GithubConfig githubConfig;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   private final ContributionSchedulerProperties contributionSchedulerProperties;
 
@@ -126,6 +133,10 @@ public class ContributionScheduler {
   }
 
   private void runJob() {
+    GitHubUploader gitHubUploader = null;
+    String targetPath = generateLogTargetPath();
+    String commitMessage = "Scheduled job logs upload " + targetPath;
+
     log.info(">>> ENTERED runJob(), isRunning: {}", isRunning.get());
     if (!isRunning.compareAndSet(false, true)) {
       log.warn("Scheduler already running.");
@@ -141,15 +152,43 @@ public class ContributionScheduler {
       log.info("Starting scheduled summary generation...");
       summaryService.generateSummaries(0);
       log.info("Summary generation complete.");
+
+      // Upload logs before deleting pod
+      try {
+        log.info("Uploading logs before deleting pod...");
+        gitHubUploader = new GitHubUploader( githubConfig.getToken(), "gshubhamCode/oss-captain-api-logs");
+        gitHubUploader.uploadFolderInZip("./logs", targetPath, commitMessage);
+        log.info("Logs upload complete.");
+      } catch (Exception e) {
+        log.error("Error uploading logs before pod deletion", e);
+      }
+
       runPodManager.deletePod(runPodConfig.getSelfPodId());
 
     } catch (Exception e) {
       log.error("Error during scheduled task", e);
+      // Upload logs before deleting pod
+      try {
+        log.info("Uploading logs before deleting pod...");
+        gitHubUploader.uploadFolderInZip("./logs", targetPath, commitMessage);
+        log.info("Logs upload complete.");
+      } catch (Exception ex) {
+        log.error("Error uploading logs before pod deletion", ex);
+      }
     } finally {
       log.info("Reset Scheduler status  isRunning: {}", isRunning.get());
       isRunning.set(false);
       log.info("Reset done  isRunning: {}", isRunning.get());
     }
+  }
+
+  public String generateLogTargetPath() {
+    LocalDateTime now = LocalDateTime.now();
+
+    String date = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    String time = now.format(DateTimeFormatter.ofPattern("HHmmss"));
+
+    return String.format("logs/%s/logs_%s_%s.zip", date, date, time);
   }
 
   public SchedulerStatusDTO getStatus() {
